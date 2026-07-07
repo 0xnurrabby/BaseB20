@@ -73,13 +73,14 @@ Get test ETH from a Base Sepolia faucet before deploying.
 ## Deploying & Verifying
 
 You deploy straight from the browser. The app signs a contract-creation
-transaction with your wallet. After a deploy, the success dialog shows the exact
-`arguments.js` and the one-line command to verify the source on BaseScan:
+transaction with your wallet. After a deploy, the success dialog has a
+`Copy ready command` button for BaseScan verification. Run it from `contracts/`;
+it writes `arguments.js` and then runs Hardhat verify.
 
 ```bash
 cd contracts
 export BASESCAN_API_KEY=your_key
-# save the arguments.js shown in the app, then:
+# paste the copied command from the success dialog
 npx hardhat verify --network baseSepolia --constructor-args arguments.js <TOKEN_ADDRESS>
 ```
 

@@ -234,13 +234,14 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          After deploying, the success dialog gives you the exact <code className="rounded bg-elevated px-1">arguments.js</code> and
-          a one-line command to verify the source on BaseScan. From the <code className="rounded bg-elevated px-1">contracts/</code> folder:
+          After deploying, the success dialog gives you a <b>Copy ready command</b> button.
+          Open the <code className="rounded bg-elevated px-1">contracts/</code> folder, paste that command, and it creates
+          <code className="rounded bg-elevated px-1"> arguments.js</code> before running Hardhat verify.
         </P>
-        <Pre>{`# 1. set your key (Etherscan V2 key works for BaseScan)
+        <Pre>{`# Set your key once if Hardhat asks for it.
 export BASESCAN_API_KEY=your_key
 
-# 2. save the arguments.js shown after deploy, then:
+# The copied command writes arguments.js, then runs:
 npx hardhat verify --network baseSepolia \\
   --constructor-args arguments.js <TOKEN_ADDRESS>`}</Pre>
         <P>Once verified, holders see a green checkmark and can read every line of your token's code.</P>

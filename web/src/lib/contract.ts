@@ -52,3 +52,9 @@ export function buildVerifyArgs(cfg: TokenConfigInput): string {
 export function verifyCommand(address: string, network: "baseSepolia"): string {
   return `npx hardhat verify --network ${network} --constructor-args arguments.js ${address}`;
 }
+
+/** One pasted terminal command: writes arguments.js, then runs Hardhat verify. */
+export function verifyReadyCommand(cfg: TokenConfigInput, address: string, network: "baseSepolia"): string {
+  const writeArgs = `node -e 'require("fs").writeFileSync("arguments.js", ${JSON.stringify(buildVerifyArgs(cfg))})'`;
+  return `${writeArgs} && ${verifyCommand(address, network)}`;
+}

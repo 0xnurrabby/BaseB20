@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccount, useChainId, useDeployContract, useWaitForTransactionReceipt } from "wagmi";
-import { B20_ABI, B20_BYTECODE, buildVerifyArgs, verifyCommand, type TokenConfigInput } from "../lib/contract";
+import { B20_ABI, B20_BYTECODE, buildVerifyArgs, verifyCommand, verifyReadyCommand, type TokenConfigInput } from "../lib/contract";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
 import { commafy, isAddressLike } from "../lib/format";
 import { saveToken } from "../lib/storage";
@@ -498,6 +498,11 @@ function SuccessModal({
   cfg: TokenConfigInput | null;
 }) {
   const net = "baseSepolia";
+  const verifyUrl = address ? `${explorerUrl(chainId)}/verifyContract?a=${address}` : "";
+  const argsFile = cfg ? buildVerifyArgs(cfg) : "";
+  const hardhatCommand = address ? verifyCommand(address, net) : "";
+  const readyCommand = address && cfg ? verifyReadyCommand(cfg, address, net) : "";
+
   return (
     <Modal open={open} onClose={onClose} title="Token deployed" size="md">
       {address && cfg && (
@@ -531,21 +536,44 @@ function SuccessModal({
             </Link>
           </div>
 
-          <details className="rounded-xl border border-border bg-elevated/50 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium">Verify on BaseScan (optional)</summary>
-            <div className="mt-3 space-y-2 text-xs text-muted">
-              <p>In the <code className="rounded bg-surface px-1">contracts/</code> folder, save this as <code className="rounded bg-surface px-1">arguments.js</code>:</p>
-              <div className="relative">
-                <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-3 font-mono text-[11px] leading-relaxed">{buildVerifyArgs(cfg)}</pre>
-                <CopyButton value={buildVerifyArgs(cfg)} className="absolute right-2 top-2" />
+          <div className="rounded-xl border border-border bg-elevated/50 px-4 py-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Verify on BaseScan</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  Open the <code className="rounded bg-surface px-1">contracts/</code> folder, copy one command, then run it.
+                </p>
               </div>
-              <p>Then run:</p>
-              <div className="relative">
-                <pre className="overflow-auto rounded-lg border border-border bg-surface p-3 font-mono text-[11px]">{verifyCommand(address, net)}</pre>
-                <CopyButton value={verifyCommand(address, net)} className="absolute right-2 top-2" />
-              </div>
+              <Badge tone="positive" className="w-fit">
+                Base Sepolia
+              </Badge>
             </div>
-          </details>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <CopyButton
+                value={readyCommand}
+                label="Copy ready command"
+                className="h-10 justify-center rounded-xl bg-surface text-sm font-medium text-fg"
+              />
+              <a href={verifyUrl} target="_blank" rel="noreferrer">
+                <Button variant="outline" fullWidth className="gap-1.5">
+                  <IconExternal className="h-4 w-4" /> Open verify page
+                </Button>
+              </a>
+            </div>
+
+            <p className="mt-3 text-[11px] leading-relaxed text-faint">
+              If Hardhat asks for an API key, set <code className="rounded bg-surface px-1">BASESCAN_API_KEY</code> once and run the copied command again.
+            </p>
+
+            <details className="mt-3 border-t border-border pt-3">
+              <summary className="cursor-pointer text-xs font-medium text-muted">Manual copy options</summary>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <CopyButton value={argsFile} label="Copy arguments.js" className="h-9 justify-center rounded-xl bg-surface" />
+                <CopyButton value={hardhatCommand} label="Copy Hardhat command" className="h-9 justify-center rounded-xl bg-surface" />
+              </div>
+            </details>
+          </div>
 
           <p className="text-center text-[11px] text-faint">
             Saved to your local token list - find it anytime on the dashboard.
