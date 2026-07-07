@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useAccount, useChainId, useReadContracts } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useReadContracts, useWriteContract } from "wagmi";
 import { formatUnits, isAddress, parseUnits, zeroAddress } from "viem";
 import { B20_ABI } from "../lib/contract";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
@@ -25,6 +25,7 @@ import {
   IconAlert,
   IconArrowRight,
   IconBan,
+  IconCheck,
   IconCoins,
   IconExternal,
   IconFlame,
@@ -398,15 +399,74 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
   const [sell, setSell] = useState(bpsToPct(token.sellTaxBps));
   const [burn, setBurn] = useState(bpsToPct(token.burnTaxBps));
   const [wallet, setWallet] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveStep, setSaveStep] = useState("");
+  const lastToken = useRef(token.address);
+  const publicClient = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+
+  const buyBps = Math.round(buy * 100);
+  const sellBps = Math.round(sell * 100);
+  const burnBps = Math.round(burn * 100);
+  const dirty = buyBps !== token.buyTaxBps || sellBps !== token.sellTaxBps || burnBps !== token.burnTaxBps;
 
   useEffect(() => {
-    setBuy(bpsToPct(token.buyTaxBps));
-    setSell(bpsToPct(token.sellTaxBps));
-    setBurn(bpsToPct(token.burnTaxBps));
-  }, [token.buyTaxBps, token.sellTaxBps, token.burnTaxBps]);
+    const nextBuy = bpsToPct(token.buyTaxBps);
+    const nextSell = bpsToPct(token.sellTaxBps);
+    const nextBurn = bpsToPct(token.burnTaxBps);
+    if (lastToken.current !== token.address) {
+      lastToken.current = token.address;
+      setBuy(nextBuy);
+      setSell(nextSell);
+      setBurn(nextBurn);
+      return;
+    }
+    if (!dirty) {
+      setBuy(nextBuy);
+      setSell(nextSell);
+      setBurn(nextBurn);
+    }
+  }, [token.address, token.buyTaxBps, token.sellTaxBps, token.burnTaxBps, dirty]);
 
   const buyOk = buy + burn <= 25;
   const sellOk = sell + burn <= 25;
+  const feeChanges = [
+    { label: "Buy tax", fn: "setBuyTax", value: buyBps, current: token.buyTaxBps },
+    { label: "Sell tax", fn: "setSellTax", value: sellBps, current: token.sellTaxBps },
+    { label: "Burn tax", fn: "setBurnTax", value: burnBps, current: token.burnTaxBps },
+  ]
+    .filter((x) => x.value !== x.current)
+    .sort((a, b) => Number(a.value > a.current) - Number(b.value > b.current));
+
+  async function saveFees() {
+    if (!isOwner || !buyOk || !sellOk || feeChanges.length === 0 || !publicClient) return;
+    setSaving(true);
+    setDone(false);
+    setSaveError("");
+    try {
+      for (const change of feeChanges) {
+        setSaveStep(change.label);
+        const hash = await writeContractAsync({
+          address: token.address,
+          abi: B20_ABI,
+          functionName: change.fn,
+          args: [change.value],
+        });
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
+      setDone(true);
+      setSaveStep("");
+      refetch();
+      window.setTimeout(() => setDone(false), 1600);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save fees.";
+      setSaveError(message.includes("User rejected") ? "Rejected in wallet." : message.split("\n")[0].slice(0, 140));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const row = (
     label: string,
@@ -414,7 +474,6 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
     icon: React.ReactNode,
     value: number,
     onChange: (v: number) => void,
-    fn: string,
     current: number,
     ok: boolean
   ) => (
@@ -426,15 +485,7 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
       <Slider value={value} min={0} max={25} step={0.5} onChange={onChange} tone={tone} disabled={!isOwner} />
       <div className="mt-2 flex items-center justify-between">
         <span className="text-xs text-faint">On-chain: {bpsToPct(current)}%</span>
-        <TxButton
-          size="sm"
-          variant="secondary"
-          disabled={!isOwner || !ok || Math.round(value * 100) === current}
-          build={() => ({ address: token.address, abi: B20_ABI, functionName: fn, args: [Math.round(value * 100)] })}
-          onSuccess={refetch}
-        >
-          Update
-        </TxButton>
+        {Math.round(value * 100) !== current && <Badge tone="warn">Unsaved</Badge>}
       </div>
       {!ok && <p className="mt-1 text-xs text-negative">Combined with burn tax must be at most 25%.</p>}
     </div>
@@ -443,9 +494,30 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
   return (
     <SectionCard icon={<IconTrendUp className="h-5 w-5" />} title="Buy / sell tax" desc="Adjust trading fees live. Capped at 25% on-chain.">
       <div className="space-y-5">
-        {row("Buy tax", "positive", <IconTrendUp className="h-4 w-4 text-positive" />, buy, setBuy, "setBuyTax", token.buyTaxBps, buyOk)}
-        {row("Sell tax", "negative", <IconTrendDown className="h-4 w-4 text-negative" />, sell, setSell, "setSellTax", token.sellTaxBps, sellOk)}
-        {row("Burn on transfer", "neutral", <IconFlame className="h-4 w-4" />, burn, setBurn, "setBurnTax", token.burnTaxBps, buyOk && sellOk)}
+        {row("Buy tax", "positive", <IconTrendUp className="h-4 w-4 text-positive" />, buy, setBuy, token.buyTaxBps, buyOk)}
+        {row("Sell tax", "negative", <IconTrendDown className="h-4 w-4 text-negative" />, sell, setSell, token.sellTaxBps, sellOk)}
+        {row("Burn on transfer", "neutral", <IconFlame className="h-4 w-4" />, burn, setBurn, token.burnTaxBps, buyOk && sellOk)}
+
+        <div className="rounded-xl border border-border bg-elevated px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">{dirty ? `${feeChanges.length} fee change${feeChanges.length === 1 ? "" : "s"} ready` : "Fees match on-chain"}</p>
+              <p className="mt-0.5 text-xs text-muted">
+                {feeChanges.length > 1 ? "Your wallet will ask once for each changed fee." : "Saved values stay visible after refresh."}
+              </p>
+            </div>
+            <Button
+              variant={done ? "success" : "primary"}
+              loading={saving}
+              disabled={!isOwner || !dirty || !buyOk || !sellOk || saving}
+              onClick={saveFees}
+              className="whitespace-nowrap"
+            >
+              {done ? <><IconCheck className="h-4 w-4" /> Saved</> : saving ? `Saving ${saveStep}...` : "Save fee changes"}
+            </Button>
+          </div>
+          {saveError && <p className="mt-2 text-xs text-negative">{saveError}</p>}
+        </div>
 
         <div className="border-t border-border pt-4">
           <Field label="Tax collector wallet" hint={`Currently ${shortAddress(token.taxWallet, 6)}`}>

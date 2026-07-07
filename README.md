@@ -93,6 +93,12 @@ Logo uploads go through the Vercel serverless route at `api/upload-logo.js`.
 Keep `IMGBB_API_KEY` server-side in Vercel or your local environment. Do not add
 an ImgBB key as a `VITE_` variable, because Vite exposes those to browser code.
 
+## Admin Analytics
+
+The `/admin` route reads analytics from Neon through serverless API routes.
+Set `DATABASE_URL` and `ADMIN_ADDRESSES` in Vercel. `ADMIN_ADDRESSES` is a
+comma-separated list of wallet addresses that are allowed to sign in.
+
 ## A Note On Base Native B20
 
 Base's Beryl upgrade introduces a native token standard also called B20, built as

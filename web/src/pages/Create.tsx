@@ -5,6 +5,7 @@ import { B20_ABI, B20_BYTECODE, buildVerifyArgs, verifyCommand, verifyReadyComma
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
 import { commafy, isAddressLike } from "../lib/format";
 import { saveToken } from "../lib/storage";
+import { trackEvent } from "../lib/analytics";
 import {
   Badge,
   Button,
@@ -166,6 +167,7 @@ export function Create() {
 
   // Persist to registry once mined.
   const deployedAddress = receipt?.contractAddress ?? undefined;
+  const [trackedDeploy, setTrackedDeploy] = useState("");
   useEffect(() => {
     if (deployedAddress && deployedCfg && address) {
       saveToken({
@@ -177,9 +179,22 @@ export function Create() {
         deployer: address,
         txHash: hash,
       });
+      if (trackedDeploy !== deployedAddress) {
+        setTrackedDeploy(deployedAddress);
+        trackEvent({
+          eventType: "token_created",
+          wallet: address,
+          tokenAddress: deployedAddress,
+          tokenName: deployedCfg.name_,
+          tokenSymbol: deployedCfg.symbol_,
+          chainId,
+          txHash: hash,
+          pagePath: "/create",
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deployedAddress]);
+  }, [deployedAddress, trackedDeploy]);
 
   function resetAll() {
     reset();

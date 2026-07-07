@@ -1,0 +1,8 @@
+{
+  "name": "baseb20-api",
+  "private": true,
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "viem": "^2.54.6"
+  }
+}
