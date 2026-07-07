@@ -3,6 +3,19 @@
   "installCommand": "npm ci && cd web && npm ci",
   "buildCommand": "cd web && npm run build",
   "outputDirectory": "web/dist",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "baseb20.vercel.app"
+        }
+      ],
+      "destination": "https://base.nurlab.xyz/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/.*).*)",
