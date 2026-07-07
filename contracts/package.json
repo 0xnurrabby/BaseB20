@@ -1,0 +1,19 @@
+{
+  "name": "b20-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gas-optimized B20 ERC-20 token contract for the Base chain.",
+  "scripts": {
+    "compile": "hardhat compile",
+    "export": "node scripts/export-artifact.js",
+    "build": "hardhat compile && node scripts/export-artifact.js",
+    "verify": "hardhat verify --network base"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-verify": "^2.0.11",
+    "hardhat": "^2.22.10"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}

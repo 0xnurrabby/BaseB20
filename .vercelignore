@@ -1,0 +1,13 @@
+node_modules/
+web/node_modules/
+contracts/node_modules/
+dist/
+web/dist/
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+.claude/
+.env
+.env.*
+*.log
+*.tsbuildinfo

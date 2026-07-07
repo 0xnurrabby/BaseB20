@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.vercel/
+.claude/
+
+# hardhat
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+
+# vite / ts
+web/dist/
+web/node_modules/.tmp/
+web/vite.config.js
+web/vite.config.d.ts
+*.tsbuildinfo
+
+# os
+.DS_Store
+Thumbs.db
