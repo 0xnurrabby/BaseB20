@@ -84,6 +84,9 @@ export function SectionCard({
   action,
   children,
   danger,
+  className,
+  iconClassName,
+  headerClassName,
 }: {
   icon?: ReactNode;
   title: string;
@@ -91,16 +94,20 @@ export function SectionCard({
   action?: ReactNode;
   children?: ReactNode;
   danger?: boolean;
+  className?: string;
+  iconClassName?: string;
+  headerClassName?: string;
 }) {
   return (
-    <Card className={cn(danger && "border-negative/30")}>
-      <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+    <Card className={cn(danger && "border-negative/30", className)}>
+      <div className={cn("flex items-start justify-between gap-4 border-b border-border px-5 py-4", headerClassName)}>
         <div className="flex items-start gap-3">
           {icon && (
             <span
               className={cn(
                 "mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border",
-                danger ? "border-negative/30 bg-negative/10 text-negative" : "border-border bg-elevated text-fg"
+                danger ? "border-negative/30 bg-negative/10 text-negative" : "border-border bg-elevated text-fg",
+                iconClassName
               )}
             >
               {icon}

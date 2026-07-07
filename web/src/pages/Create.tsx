@@ -29,6 +29,7 @@ import {
   IconGauge,
   IconRocket,
   IconSettings,
+  IconSparkles,
   IconTrendDown,
   IconTrendUp,
   IconUsers,
@@ -74,6 +75,25 @@ const DEFAULTS: FormState = {
   limitsEnabled: false,
   maxTx: "2",
   maxWallet: "2",
+};
+
+const createPanel = {
+  basics: {
+    card: "border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
+    icon: "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
+  },
+  tax: {
+    card: "border-amber-200/80 bg-amber-50/55 dark:border-amber-400/20 dark:bg-amber-400/[0.07]",
+    icon: "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
+  },
+  mint: {
+    card: "border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]",
+    icon: "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200",
+  },
+  limits: {
+    card: "border-violet-200/80 bg-violet-50/55 dark:border-violet-400/20 dark:bg-violet-400/[0.07]",
+    icon: "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200",
+  },
 };
 
 export function Create() {
@@ -202,27 +222,48 @@ export function Create() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Create a token</h1>
-        <p className="mt-2 text-[15px] text-muted">
-          Configure it, deploy one transaction, and you'll get a manageable, BaseScan-verifiable token on{" "}
-          <strong className="text-fg">{chainName(chainId)}</strong>.
-        </p>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+      <header className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8">
+        <div className="absolute inset-0 grid-dots opacity-55" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-transparent to-violet-50 dark:from-sky-400/[0.08] dark:to-violet-400/[0.08]" />
+        <div className="relative max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
+            <IconSparkles className="h-3.5 w-3.5" />
+            Token builder
+          </span>
+          <h1 className="mt-5 font-display text-5xl leading-[0.98] text-fg sm:text-6xl">
+            Create a token that feels ready to launch.
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-muted">
+            Configure the essentials, choose optional launch controls, deploy one transaction, and
+            manage everything on <strong className="text-fg">{chainName(chainId)}</strong>.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-2">
+            {["Logo upload", "Fee controls", "Mint cap", "Anti-whale limits"].map((item) => (
+              <span key={item} className="rounded-full border border-border bg-bg/80 px-3 py-1.5 text-xs font-medium text-muted">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* ------------------------------- FORM ------------------------------- */}
         <div className="space-y-6">
           {/* Tabs */}
-          <div className="inline-flex rounded-xl border border-border bg-elevated p-1">
+          <div className="inline-flex rounded-2xl border border-border bg-surface p-1 shadow-card">
             {(["normal", "advanced"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition",
-                  tab === t ? "bg-surface text-fg shadow-soft" : "text-muted hover:text-fg"
+                  "inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition",
+                  tab === t
+                    ? t === "normal"
+                      ? "bg-sky-50 text-sky-800 shadow-soft dark:bg-sky-400/10 dark:text-sky-200"
+                      : "bg-violet-50 text-violet-800 shadow-soft dark:bg-violet-400/10 dark:text-violet-200"
+                    : "text-muted hover:text-fg"
                 )}
               >
                 {t === "normal" ? <IconCoins className="h-4 w-4" /> : <IconSettings className="h-4 w-4" />}
@@ -232,7 +273,13 @@ export function Create() {
           </div>
 
           {tab === "normal" ? (
-            <SectionCard icon={<IconCoins className="h-5 w-5" />} title="Token basics" desc="The essentials every token needs.">
+            <SectionCard
+              icon={<IconCoins className="h-5 w-5" />}
+              title="Token basics"
+              desc="The essentials every token needs."
+              className={createPanel.basics.card}
+              iconClassName={createPanel.basics.icon}
+            >
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Name" error={err("name", errors.name)} hint="e.g. Base Doge">
                   <Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Base Doge" maxLength={40} />
@@ -283,6 +330,8 @@ export function Create() {
                 title="Buy / sell tax"
                 desc="Take a fee on DEX trades, routed to a collector wallet. Total is hard-capped at 25%."
                 action={<Switch checked={f.taxEnabled} onChange={(v) => set("taxEnabled", v)} label="Enable tax" />}
+                className={createPanel.tax.card}
+                iconClassName={createPanel.tax.icon}
               >
                 {f.taxEnabled && (
                   <div className="space-y-5">
@@ -308,10 +357,12 @@ export function Create() {
                 title="Minting & supply cap"
                 desc="Allow creating more tokens later, with an optional permanent hard cap."
                 action={<Switch checked={f.mintable} onChange={(v) => set("mintable", v)} label="Enable minting" />}
+                className={createPanel.mint.card}
+                iconClassName={createPanel.mint.icon}
               >
                 {f.mintable ? (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-3">
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-surface/80 px-4 py-3 dark:border-emerald-400/20 dark:bg-surface/70">
                       <div>
                         <p className="text-sm font-medium">Hard cap</p>
                         <p className="text-xs text-muted">Cap total supply so minting can never exceed it.</p>
@@ -329,7 +380,7 @@ export function Create() {
                       </Field>
                     )}
                     <Callout tone="neutral" icon={<IconFlame className="h-4 w-4" />}>
-                      You can permanently disable minting anytime from the dashboard - a strong trust signal for holders.
+                      You can permanently disable minting anytime from the dashboard. This is a strong trust signal for holders.
                     </Callout>
                   </div>
                 ) : (
@@ -341,15 +392,17 @@ export function Create() {
               <SectionCard
                 icon={<IconUsers className="h-5 w-5" />}
                 title="Anti-whale limits"
-                desc="Cap how much a single wallet can hold or move - stops snipers dumping."
+                desc="Cap how much a single wallet can hold or move, so snipers have less room to dump."
                 action={<Switch checked={f.limitsEnabled} onChange={(v) => set("limitsEnabled", v)} label="Enable limits" />}
+                className={createPanel.limits.card}
+                iconClassName={createPanel.limits.icon}
               >
                 {f.limitsEnabled ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Max transaction" hint={`${f.maxTx}% of supply${supplyNum > 0 ? ` · ${commafy(Math.floor((supplyNum * Number(f.maxTx)) / 100))}` : ""}`}>
+                    <Field label="Max transaction" hint={`${f.maxTx}% of supply${supplyNum > 0 ? ` | ${commafy(Math.floor((supplyNum * Number(f.maxTx)) / 100))}` : ""}`}>
                       <Slider value={Number(f.maxTx)} min={0.1} max={10} step={0.1} onChange={(v) => set("maxTx", String(v))} />
                     </Field>
-                    <Field label="Max wallet" hint={`${f.maxWallet}% of supply${supplyNum > 0 ? ` · ${commafy(Math.floor((supplyNum * Number(f.maxWallet)) / 100))}` : ""}`}>
+                    <Field label="Max wallet" hint={`${f.maxWallet}% of supply${supplyNum > 0 ? ` | ${commafy(Math.floor((supplyNum * Number(f.maxWallet)) / 100))}` : ""}`}>
                       <Slider value={Number(f.maxWallet)} min={0.1} max={10} step={0.1} onChange={(v) => set("maxWallet", String(v))} />
                     </Field>
                   </div>
@@ -371,7 +424,7 @@ export function Create() {
           <PreviewCard f={f} supplyNum={supplyNum} />
           <div className="mt-4">
             {!isConnected ? (
-              <Card className="p-4 text-center">
+              <Card className="border-violet-200/80 bg-violet-50/60 p-4 text-center dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
                 <p className="mb-3 text-sm text-muted">Connect your wallet to deploy.</p>
                 <div className="flex justify-center">
                   <WalletConnect />
@@ -455,17 +508,18 @@ function PreviewCard({ f, supplyNum }: { f: FormState; supplyNum: number }) {
   ].filter((x) => x.on);
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-border bg-elevated/50 px-5 py-4">
+    <Card className="overflow-hidden border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
+      <div className="h-1 bg-gradient-to-r from-sky-300 via-violet-200 to-emerald-200 dark:from-sky-400/50 dark:via-violet-400/30 dark:to-emerald-400/30" />
+      <div className="flex items-center gap-3 border-b border-sky-200/70 bg-surface/80 px-5 py-4 dark:border-sky-400/20 dark:bg-surface/70">
         {f.logoURI ? (
           <img src={f.logoURI} alt="" className="h-11 w-11 rounded-full border border-border object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
         ) : (
-          <span className="grid h-11 w-11 place-items-center rounded-full border border-border bg-surface font-mono text-sm font-semibold">
+          <span className="grid h-11 w-11 place-items-center rounded-full border border-sky-200 bg-sky-100 font-mono text-sm font-semibold text-sky-800 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
             {symbol.slice(0, 3)}
           </span>
         )}
         <div className="min-w-0">
-          <p className="truncate font-semibold">{f.name.trim() || "Your Token"}</p>
+          <p className="truncate font-display text-2xl leading-none text-fg">{f.name.trim() || "Your Token"}</p>
           <p className="font-mono text-xs text-muted">${symbol}</p>
         </div>
       </div>
@@ -478,7 +532,7 @@ function PreviewCard({ f, supplyNum }: { f: FormState; supplyNum: number }) {
         {f.limitsEnabled && <Row label="Max wallet" value={`${f.maxWallet}%`} />}
       </div>
       {flags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-t border-border px-5 py-3">
+        <div className="flex flex-wrap gap-1.5 border-t border-sky-200/70 bg-surface/60 px-5 py-3 dark:border-sky-400/20 dark:bg-surface/50">
           {flags.map((x) => (
             <Badge key={x.label} tone="accent">
               <IconCheck className="h-3 w-3" /> {x.label}
@@ -591,7 +645,7 @@ function SuccessModal({
           </div>
 
           <p className="text-center text-[11px] text-faint">
-            Saved to your local token list - find it anytime on the dashboard.
+            Saved to your local token list. Find it anytime on the dashboard.
           </p>
         </div>
       )}

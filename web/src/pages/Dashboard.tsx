@@ -18,6 +18,7 @@ import {
   Slider,
   Switch,
   Textarea,
+  cn,
 } from "../components/ui";
 import { TxButton } from "../components/TxButton";
 import { WalletConnect } from "../components/WalletConnect";
@@ -29,6 +30,7 @@ import {
   IconCoins,
   IconExternal,
   IconFlame,
+  IconGauge,
   IconLifebuoy,
   IconLink,
   IconLock,
@@ -73,6 +75,45 @@ interface Ctx {
   isOwner: boolean;
   refetch: () => void;
 }
+
+const dashboardTone = {
+  picker: {
+    card: "border-sky-200/80 bg-sky-50/60 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
+    icon: "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
+  },
+  tax: {
+    card: "border-amber-200/80 bg-amber-50/55 dark:border-amber-400/20 dark:bg-amber-400/[0.07]",
+    icon: "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
+  },
+  trading: {
+    card: "border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
+    icon: "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
+  },
+  supply: {
+    card: "border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]",
+    icon: "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200",
+  },
+  limits: {
+    card: "border-violet-200/80 bg-violet-50/55 dark:border-violet-400/20 dark:bg-violet-400/[0.07]",
+    icon: "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200",
+  },
+  pairs: {
+    card: "border-cyan-200/80 bg-cyan-50/55 dark:border-cyan-400/20 dark:bg-cyan-400/[0.07]",
+    icon: "border-cyan-200 bg-cyan-100 text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-200",
+  },
+  access: {
+    card: "border-rose-200/80 bg-rose-50/55 dark:border-rose-400/20 dark:bg-rose-400/[0.07]",
+    icon: "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200",
+  },
+  airdrop: {
+    card: "border-lime-200/80 bg-lime-50/55 dark:border-lime-400/20 dark:bg-lime-400/[0.07]",
+    icon: "border-lime-200 bg-lime-100 text-lime-700 dark:border-lime-400/25 dark:bg-lime-400/10 dark:text-lime-200",
+  },
+  rescue: {
+    card: "border-slate-200/90 bg-slate-50/70 dark:border-slate-400/20 dark:bg-slate-400/[0.07]",
+    icon: "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-400/25 dark:bg-slate-400/10 dark:text-slate-200",
+  },
+};
 
 export function Dashboard() {
   const { address: routeAddress } = useParams();
@@ -176,17 +217,25 @@ export function Dashboard() {
   // ---------------------------- picker view ----------------------------
   if (!selected) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">Token dashboard</h1>
-          <p className="mt-2 text-[15px] text-muted">
-            Pick a token you created, or paste any B20 token address on {chainName(chainId)} to manage it.
-          </p>
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
+        <header className="relative mb-6 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8">
+          <div className="absolute inset-0 grid-dots opacity-55" />
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-transparent to-sky-50 dark:from-emerald-400/[0.08] dark:to-sky-400/[0.08]" />
+          <div className="relative max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <IconGauge className="h-3.5 w-3.5" />
+              Owner dashboard
+            </span>
+            <h1 className="mt-5 font-display text-5xl leading-[0.98] text-fg sm:text-6xl">Manage your token controls.</h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-muted">
+              Pick a saved token, or paste any B20 token address on <strong className="text-fg">{chainName(chainId)}</strong>.
+            </p>
+          </div>
         </header>
 
-        <Card className="mb-6 p-5">
+        <Card className="mb-6 border-sky-200/80 bg-sky-50/60 p-5 shadow-card dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
           <Field label="Token contract address" hint="Manage any token deployed with this studio.">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 value={manual}
                 onChange={(e) => setManual(e.target.value.trim())}
@@ -209,9 +258,9 @@ export function Dashboard() {
         </div>
 
         {saved.length === 0 ? (
-          <Card className="grid place-items-center px-6 py-14 text-center">
-            <span className="mb-3 grid h-12 w-12 place-items-center rounded-2xl border border-border bg-elevated">
-              <IconCoins className="h-6 w-6 text-muted" />
+          <Card className="grid place-items-center border-violet-200/80 bg-violet-50/60 px-6 py-14 text-center dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
+            <span className="mb-3 grid h-12 w-12 place-items-center rounded-2xl border border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200">
+              <IconCoins className="h-6 w-6" />
             </span>
             <p className="text-sm text-muted">No tokens yet on this network.</p>
             <Link to="/create" className="mt-4">
@@ -258,7 +307,7 @@ export function Dashboard() {
             <code className="font-mono text-xs">{selected}</code> doesn't look like a readable token on {chainName(chainId)}.
             Double-check the address and network.
           </p>
-          <Link to="/dashboard" className="mt-2 inline-block underline">← Back to token list</Link>
+          <Link to="/dashboard" className="mt-2 inline-block underline">Back to token list</Link>
         </Callout>
       </Centered>
     );
@@ -268,25 +317,26 @@ export function Dashboard() {
   const renounced = token.owner === zeroAddress;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
       <Link to="/dashboard" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
-        ← All tokens
+        All tokens
       </Link>
 
       {/* Identity header */}
-      <Card className="mb-5 overflow-hidden">
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <Card className="mb-5 overflow-hidden border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
+        <div className="h-1 bg-gradient-to-r from-emerald-300 via-sky-200 to-violet-200 dark:from-emerald-400/50 dark:via-sky-400/30 dark:to-violet-400/30" />
+        <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             {token.logoURI ? (
               <img src={token.logoURI} alt="" className="h-14 w-14 rounded-full border border-border object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
             ) : (
-              <span className="grid h-14 w-14 place-items-center rounded-full border border-border bg-elevated font-mono text-lg font-semibold">
+              <span className="grid h-14 w-14 place-items-center rounded-full border border-emerald-200 bg-emerald-100 font-mono text-lg font-semibold text-emerald-800 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200">
                 {token.symbol.slice(0, 3)}
               </span>
             )}
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight">{token.name}</h1>
+                <h1 className="font-display text-4xl leading-none text-fg">{token.name}</h1>
                 <span className="font-mono text-sm text-muted">${token.symbol}</span>
               </div>
               <div className="mt-1 flex items-center gap-2">
@@ -314,11 +364,11 @@ export function Dashboard() {
             {token.mintingEnabled ? <Badge tone="neutral">Mintable</Badge> : <Badge tone="neutral">Fixed supply</Badge>}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-px border-t border-border bg-border sm:grid-cols-4">
-          <MiniStat label="Total supply" value={formatAmount(token.totalSupply, token.decimals)} />
-          <MiniStat label="Your balance" value={formatAmount(token.balance, token.decimals)} />
-          <MiniStat label="Max supply" value={token.maxSupply === 0n ? "Uncapped" : formatAmount(token.maxSupply, token.decimals)} />
-          <MiniStat label="Buy / Sell tax" value={`${bpsToPct(token.buyTaxBps)}% / ${bpsToPct(token.sellTaxBps)}%`} />
+        <div className="grid grid-cols-2 gap-px border-t border-emerald-200/70 bg-emerald-200/70 dark:border-emerald-400/20 dark:bg-emerald-400/20 sm:grid-cols-4">
+          <MiniStat tone="mint" label="Total supply" value={formatAmount(token.totalSupply, token.decimals)} />
+          <MiniStat tone="sky" label="Your balance" value={formatAmount(token.balance, token.decimals)} />
+          <MiniStat tone="violet" label="Max supply" value={token.maxSupply === 0n ? "Uncapped" : formatAmount(token.maxSupply, token.decimals)} />
+          <MiniStat tone="amber" label="Buy / Sell tax" value={`${bpsToPct(token.buyTaxBps)}% / ${bpsToPct(token.sellTaxBps)}%`} />
         </div>
       </Card>
 
@@ -328,7 +378,7 @@ export function Dashboard() {
         </Callout>
       )}
       {!isConnected && (
-        <Card className="mb-5 flex flex-col items-center gap-3 p-5 text-center sm:flex-row sm:justify-between sm:text-left">
+        <Card className="mb-5 flex flex-col items-center gap-3 border-sky-200/80 bg-sky-50/60 p-5 text-center dark:border-sky-400/20 dark:bg-sky-400/[0.07] sm:flex-row sm:justify-between sm:text-left">
           <p className="text-sm text-muted">Connect the owner wallet to unlock controls.</p>
           <WalletConnect />
         </Card>
@@ -356,9 +406,15 @@ function Centered({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">{children}</div>;
 }
 
-function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
+function MiniStat({ label, value, tone }: { label: string; value: React.ReactNode; tone: "mint" | "sky" | "violet" | "amber" }) {
+  const toneClass = {
+    mint: "bg-emerald-50/95 dark:bg-emerald-400/[0.08]",
+    sky: "bg-sky-50/95 dark:bg-sky-400/[0.08]",
+    violet: "bg-violet-50/95 dark:bg-violet-400/[0.08]",
+    amber: "bg-amber-50/95 dark:bg-amber-400/[0.08]",
+  }[tone];
   return (
-    <div className="bg-surface px-4 py-3">
+    <div className={cn("px-4 py-3", toneClass)}>
       <p className="text-[11px] uppercase tracking-wide text-faint">{label}</p>
       <p className="mt-0.5 truncate text-[15px] font-semibold">{value}</p>
     </div>
@@ -367,9 +423,9 @@ function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
 
 function SavedRow({ t, onOpen, onRemove, chainId }: { t: SavedToken; onOpen: () => void; onRemove: () => void; chainId: number }) {
   return (
-    <Card className="flex items-center justify-between p-4 transition hover:border-ring">
+    <Card className="flex items-center justify-between border-sky-200/70 bg-sky-50/45 p-4 transition hover:border-sky-300 dark:border-sky-400/20 dark:bg-sky-400/[0.06]">
       <button onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-elevated font-mono text-xs font-semibold">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-sky-200 bg-sky-100 font-mono text-xs font-semibold text-sky-800 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
           {t.symbol.slice(0, 3)}
         </span>
         <div className="min-w-0">
@@ -492,13 +548,19 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
   );
 
   return (
-    <SectionCard icon={<IconTrendUp className="h-5 w-5" />} title="Buy / sell tax" desc="Adjust trading fees live. Capped at 25% on-chain.">
+    <SectionCard
+      icon={<IconTrendUp className="h-5 w-5" />}
+      title="Buy / sell tax"
+      desc="Adjust trading fees live. Capped at 25% on-chain."
+      className={dashboardTone.tax.card}
+      iconClassName={dashboardTone.tax.icon}
+    >
       <div className="space-y-5">
         {row("Buy tax", "positive", <IconTrendUp className="h-4 w-4 text-positive" />, buy, setBuy, token.buyTaxBps, buyOk)}
         {row("Sell tax", "negative", <IconTrendDown className="h-4 w-4 text-negative" />, sell, setSell, token.sellTaxBps, sellOk)}
         {row("Burn on transfer", "neutral", <IconFlame className="h-4 w-4" />, burn, setBurn, token.burnTaxBps, buyOk && sellOk)}
 
-        <div className="rounded-xl border border-border bg-elevated px-4 py-3">
+        <div className="rounded-xl border border-amber-200/70 bg-surface/80 px-4 py-3 dark:border-amber-400/20 dark:bg-surface/70">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">{dirty ? `${feeChanges.length} fee change${feeChanges.length === 1 ? "" : "s"} ready` : "Fees match on-chain"}</p>
@@ -542,7 +604,13 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
 
 function TradingPanel({ token, isOwner, refetch }: Ctx) {
   return (
-    <SectionCard icon={<IconLock className="h-5 w-5" />} title="Trading" desc="Open the market on your signal, or pause instantly.">
+    <SectionCard
+      icon={<IconLock className="h-5 w-5" />}
+      title="Trading"
+      desc="Open the market on your signal, or pause instantly."
+      className={dashboardTone.trading.card}
+      iconClassName={dashboardTone.trading.icon}
+    >
       <div className="space-y-4">
         {!token.tradingActive ? (
           <div>
@@ -562,10 +630,10 @@ function TradingPanel({ token, isOwner, refetch }: Ctx) {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl border border-sky-200/70 bg-surface/80 px-4 py-3 dark:border-sky-400/20 dark:bg-surface/70">
             <div>
               <p className="text-sm font-medium">{token.tradingPaused ? "Trading paused" : "Trading live"}</p>
-              <p className="text-xs text-muted">Emergency switch - pause all non-exempt transfers.</p>
+              <p className="text-xs text-muted">Emergency switch for pausing all non-exempt transfers.</p>
             </div>
             <TxButton
               size="sm"
@@ -595,7 +663,13 @@ function SupplyPanel({ token, isOwner, refetch }: Ctx) {
   } catch { mintArgs = null; }
 
   return (
-    <SectionCard icon={<IconCoins className="h-5 w-5" />} title="Supply & minting" desc={token.mintingEnabled ? "Mint new tokens or lock minting forever." : "Minting is permanently disabled."}>
+    <SectionCard
+      icon={<IconCoins className="h-5 w-5" />}
+      title="Supply & minting"
+      desc={token.mintingEnabled ? "Mint new tokens or lock minting forever." : "Minting is permanently disabled."}
+      className={dashboardTone.supply.card}
+      iconClassName={dashboardTone.supply.icon}
+    >
       {token.mintingEnabled ? (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
@@ -608,7 +682,7 @@ function SupplyPanel({ token, isOwner, refetch }: Ctx) {
           </div>
           {token.maxSupply !== 0n && (
             <p className="text-xs text-faint">
-              Cap: {formatAmount(token.maxSupply, token.decimals)} · Room to mint: {formatAmount(token.maxSupply - token.totalSupply, token.decimals)}
+              Cap: {formatAmount(token.maxSupply, token.decimals)} | Room to mint: {formatAmount(token.maxSupply - token.totalSupply, token.decimals)}
             </p>
           )}
           <TxButton fullWidth disabled={!canMint || !mintArgs} build={() => mintArgs ? { address: token.address, abi: B20_ABI, functionName: "mint", args: mintArgs } : null} onSuccess={() => { setAmount(""); refetch(); }}>
@@ -656,6 +730,8 @@ function LimitsPanel({ token, isOwner, refetch }: Ctx) {
       icon={<IconUsers className="h-5 w-5" />}
       title="Anti-whale limits"
       desc="Cap per-transaction and per-wallet amounts."
+      className={dashboardTone.limits.card}
+      iconClassName={dashboardTone.limits.icon}
       action={
         <TxButton
           size="sm"
@@ -690,7 +766,13 @@ function PairsPanel({ token, isOwner, refetch }: Ctx) {
   const [pair, setPair] = useState("");
   const valid = isAddress(pair);
   return (
-    <SectionCard icon={<IconLink className="h-5 w-5" />} title="DEX pairs" desc="Register your liquidity pair so buy/sell tax applies to trades.">
+    <SectionCard
+      icon={<IconLink className="h-5 w-5" />}
+      title="DEX pairs"
+      desc="Register your liquidity pair so buy/sell tax applies to trades."
+      className={dashboardTone.pairs.card}
+      iconClassName={dashboardTone.pairs.icon}
+    >
       <Callout tone="neutral" icon={<IconAlert className="h-4 w-4" />}>
         After adding liquidity on a DEX (e.g. Aerodrome/Uniswap), paste the <strong>pair/pool address</strong> and mark it as a pair.
       </Callout>
@@ -713,7 +795,13 @@ function AccessPanel({ token, isOwner, refetch }: Ctx) {
   const [addr, setAddr] = useState("");
   const valid = isAddress(addr);
   return (
-    <SectionCard icon={<IconBan className="h-5 w-5" />} title="Blacklist & whitelist" desc="Block bad actors, or run a strict allowlist.">
+    <SectionCard
+      icon={<IconBan className="h-5 w-5" />}
+      title="Blacklist & whitelist"
+      desc="Block bad actors, or run a strict allowlist."
+      className={dashboardTone.access.card}
+      iconClassName={dashboardTone.access.icon}
+    >
       <div className="space-y-4">
         <Field label="Account address">
           <Input value={addr} onChange={(e) => setAddr(e.target.value.trim())} placeholder="0x..." className="font-mono text-xs" disabled={!isOwner} />
@@ -727,7 +815,7 @@ function AccessPanel({ token, isOwner, refetch }: Ctx) {
           </TxButton>
         </div>
 
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-rose-200/70 pt-4 dark:border-rose-400/20">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Whitelist-only mode</p>
@@ -777,13 +865,19 @@ function AirdropPanel({ token, refetch }: Ctx) {
   const ready = !!connected && parsed.recipients.length > 0 && !parsed.error && enough;
 
   return (
-    <SectionCard icon={<IconSend className="h-5 w-5" />} title="Batch airdrop" desc="Send tokens to many wallets in one transaction (from your wallet).">
+    <SectionCard
+      icon={<IconSend className="h-5 w-5" />}
+      title="Batch airdrop"
+      desc="Send tokens to many wallets in one transaction (from your wallet)."
+      className={dashboardTone.airdrop.card}
+      iconClassName={dashboardTone.airdrop.icon}
+    >
       <div className="space-y-3">
         <Field label="Recipients" hint="One per line: address, amount">
           <Textarea value={raw} onChange={(e) => setRaw(e.target.value)} placeholder={"0xabc..., 1000\n0xdef..., 2500"} />
         </Field>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted">{parsed.recipients.length} recipients · {formatAmount(parsed.total, token.decimals)} {token.symbol}</span>
+          <span className="text-muted">{parsed.recipients.length} recipients | {formatAmount(parsed.total, token.decimals)} {token.symbol}</span>
           {connected && !enough && parsed.recipients.length > 0 && <span className="text-negative">Exceeds your balance</span>}
         </div>
         {parsed.error && <p className="text-xs text-negative">{parsed.error}</p>}
@@ -801,10 +895,17 @@ function OwnershipPanel({ token, isOwner, refetch, isPendingOwner }: Ctx & { isP
   const renounced = token.owner === zeroAddress;
 
   return (
-    <SectionCard danger icon={<IconShield className="h-5 w-5" />} title="Ownership" desc="Transfer control (2-step) or renounce it entirely.">
+    <SectionCard
+      danger
+      icon={<IconShield className="h-5 w-5" />}
+      title="Ownership"
+      desc="Transfer control (2-step) or renounce it entirely."
+      className="border-rose-200/90 bg-rose-50/65 dark:border-rose-400/20 dark:bg-rose-400/[0.08]"
+      iconClassName={dashboardTone.access.icon}
+    >
       {renounced ? (
         <Callout tone="positive" icon={<IconShield className="h-4 w-4" />}>
-          Ownership is <strong>renounced</strong>. No one can change this token's settings - fully decentralized.
+          Ownership is <strong>renounced</strong>. No one can change this token's settings. It is fully decentralized.
         </Callout>
       ) : (
         <div className="space-y-4">
@@ -828,7 +929,7 @@ function OwnershipPanel({ token, isOwner, refetch, isPendingOwner }: Ctx & { isP
               </TxButton>
             </div>
           </Field>
-          <div className="border-t border-border pt-4">
+          <div className="border-t border-rose-200/70 pt-4 dark:border-rose-400/20">
             <TxButton
               fullWidth
               variant="danger"
@@ -858,7 +959,13 @@ function RescuePanel({ token, isOwner, refetch }: Ctx) {
   } catch { args = null; }
 
   return (
-    <SectionCard icon={<IconLifebuoy className="h-5 w-5" />} title="Rescue stuck funds" desc="Recover tokens or ETH accidentally sent to the contract.">
+    <SectionCard
+      icon={<IconLifebuoy className="h-5 w-5" />}
+      title="Rescue stuck funds"
+      desc="Recover tokens or ETH accidentally sent to the contract."
+      className={dashboardTone.rescue.card}
+      iconClassName={dashboardTone.rescue.icon}
+    >
       <div className="space-y-3">
         <Field label="Foreign token address">
           <Input value={tokenAddr} onChange={(e) => setTokenAddr(e.target.value.trim())} placeholder="0x... (not this token)" className="font-mono text-xs" disabled={!isOwner} />
