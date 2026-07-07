@@ -18,7 +18,7 @@ import {
 } from "../components/icons";
 
 const FEATURES = [
-  { icon: IconTrendUp, title: "Buy / sell tax", desc: "Separate buy & sell fees to a collector wallet. Hard-capped at 25% on-chain — impossible to rug." },
+  { icon: IconTrendUp, title: "Buy / sell tax", desc: "Separate buy & sell fees to a collector wallet. Hard-capped at 25% on-chain - impossible to rug." },
   { icon: IconFlame, title: "Burn on transfer", desc: "Deflationary by design. Burn a slice of every transfer automatically." },
   { icon: IconCoins, title: "Mint & hard cap", desc: "Optional minting with a permanent max-supply cap, plus a one-way ‘disable forever’ switch." },
   { icon: IconUsers, title: "Anti-whale limits", desc: "Max wallet & max transaction caps stop snipers from buying the whole supply at once." },
@@ -45,7 +45,7 @@ export function Home() {
             <span className="text-muted">Then actually run it.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-[15px] leading-relaxed text-muted sm:text-lg">
-            Create a gas-optimized, BaseScan-verifiable ERC-20 in minutes — no code — then manage
+            Create a gas-optimized, BaseScan-verifiable ERC-20 in minutes - no code - then manage
             taxes, limits, minting and more live from a full owner dashboard.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -72,7 +72,7 @@ export function Home() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Everything, built in</h2>
             <p className="mt-2 max-w-xl text-[15px] text-muted">
-              The advanced features that normally take a Solidity dev and an audit — toggled on with a
+              The advanced features that normally take a Solidity dev and an audit - toggled on with a
               switch, safety rails included.
             </p>
           </div>
@@ -99,7 +99,7 @@ export function Home() {
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Three steps to launch</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {[
-              { n: "01", icon: IconCoins, t: "Configure", d: "Pick a name, supply and logo. Flip on the advanced features you want — taxes, limits, mint, blacklist." },
+              { n: "01", icon: IconCoins, t: "Configure", d: "Pick a name, supply and logo. Flip on the advanced features you want - taxes, limits, mint, blacklist." },
               { n: "02", icon: IconRocket, t: "Deploy", d: "Sign one transaction. Your contract goes live on Base and is instantly BaseScan-verifiable." },
               { n: "03", icon: IconGauge, t: "Manage", d: "Open the dashboard to tune taxes with sliders, airdrop, pause, renounce ownership and more." },
             ].map(({ n, icon: Icon, t, d }) => (
@@ -129,7 +129,7 @@ export function Home() {
             <p className="mt-1.5 text-sm leading-relaxed text-muted">
               This studio deploys a battle-tested Solidity ERC-20 so you get taxes, limits and BaseScan
               verification right now. Base's upcoming <em>native</em> B20 precompile standard is a separate,
-              compliance-focused system — we explain exactly how they differ in the docs.
+              compliance-focused system - we explain exactly how they differ in the docs.
             </p>
           </div>
           <Link to="/docs">
@@ -152,7 +152,7 @@ export function Home() {
           <Card className="flex items-center gap-4 border-negative/25 bg-negative/[0.04] p-5">
             <IconTrendDown className="h-6 w-6 text-negative" />
             <p className="text-sm text-muted">
-              <strong className="text-fg">Sell tax</strong> with a hard 25% ceiling — enforced in the contract.
+              <strong className="text-fg">Sell tax</strong> with a hard 25% ceiling - enforced in the contract.
             </p>
           </Card>
         </div>

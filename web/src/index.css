@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
-  Theme tokens — an "Ollama"-style clean, quiet palette.
+  Theme tokens - an "Ollama"-style clean, quiet palette.
   Near-black on warm off-white; light red / green used sparingly as accents.
   Dark mode is applied via the `.dark` class on <html>, which the ThemeProvider
   keeps in sync with the OS (prefers-color-scheme) unless the user overrides it.

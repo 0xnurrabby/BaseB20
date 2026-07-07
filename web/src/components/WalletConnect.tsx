@@ -89,7 +89,7 @@ function ConnectModal({ open, onClose }: { open: boolean; onClose: () => void })
               <span className="text-sm font-medium">{c.name}</span>
             </span>
             {isPending && pendingId === c.uid ? (
-              <span className="text-xs text-muted">Connecting…</span>
+              <span className="text-xs text-muted">Connecting...</span>
             ) : null}
           </button>
         ))}
@@ -141,7 +141,7 @@ function AccountModal({
           <div className="mt-3 flex items-center justify-between text-xs text-muted">
             <span>{connectorName ?? "Connected"}</span>
             <span>
-              {balance ? `${Number(balance.formatted).toFixed(4)} ${balance.symbol}` : "—"}
+              {balance ? `${Number(balance.formatted).toFixed(4)} ${balance.symbol}` : "-"}
             </span>
           </div>
         </div>

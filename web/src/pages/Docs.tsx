@@ -18,7 +18,7 @@ const SECTIONS: Section[] = [
         <P>
           <b>B20</b> is a no-code studio for launching and running ERC-20 tokens on the{" "}
           <b>Base</b> chain. You configure a token in the browser, deploy it with a single wallet
-          transaction, and then manage every setting live from the dashboard — taxes, limits,
+          transaction, and then manage every setting live from the dashboard - taxes, limits,
           minting, blacklists, ownership and more.
         </P>
         <P>
@@ -28,11 +28,11 @@ const SECTIONS: Section[] = [
         <Callout tone="neutral" icon={<IconShield className="h-4 w-4" />} title="B20 studio vs. Base's native B20 standard">
           Base is shipping a <i>native</i> token standard also called <b>B20</b> (part of the Beryl
           upgrade). That one is implemented as chain-level <b>precompiles</b> aimed at regulated
-          stablecoin / real-world-asset issuers — it has compliance policies, freeze-and-seize and
+          stablecoin / real-world-asset issuers - it has compliance policies, freeze-and-seize and
           supply caps, but <b>no trading tax, max-wallet or max-transaction</b> features, and its
           mainnet rollout is staged. This studio instead deploys a classic Solidity ERC-20 so you get
           taxes, anti-whale limits and instant BaseScan verification today. Same spirit, different
-          engine — pick this when you want a tradeable community token.
+          engine - pick this when you want a tradeable community token.
         </Callout>
       </>
     ),
@@ -43,8 +43,8 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <Ol>
-          <li><b>Connect a wallet</b> (MetaMask, Rabby, Coinbase Wallet…) from the top-right button.</li>
-          <li><b>Pick a network.</b> Always rehearse on <b>Base Sepolia</b> (testnet) first — it's free.</li>
+          <li><b>Connect a wallet</b> (MetaMask, Rabby, Coinbase Wallet...) from the top-right button.</li>
+          <li><b>Pick a network.</b> Always rehearse on <b>Base Sepolia</b> (testnet) first - it's free.</li>
           <li>Grab test ETH from a Base Sepolia faucet, then deploy for real on <b>Base</b> when you're happy.</li>
         </Ol>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
@@ -60,14 +60,14 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>The <Link to="/create" className="underline">Create</Link> page has two tabs:</P>
-        <P><b>Basics</b> — name, symbol, total supply, decimals (18 is standard) and an optional logo URL. The full supply is minted to your wallet, which becomes the owner.</P>
-        <P><b>Advanced</b> — flip on only what you need:</P>
+        <P><b>Basics</b> - name, symbol, total supply, decimals (18 is standard) and an optional logo URL. The full supply is minted to your wallet, which becomes the owner.</P>
+        <P><b>Advanced</b> - flip on only what you need:</P>
         <Ul>
           <li><b>Buy / sell tax</b> and burn-on-transfer</li>
           <li><b>Minting</b> with an optional permanent hard cap</li>
           <li><b>Anti-whale limits</b> (max transaction & max wallet)</li>
         </Ul>
-        <P>Everything else (blacklist, pause, airdrop, renounce…) is switched on later from the dashboard, so you're never locked into a decision at launch.</P>
+        <P>Everything else (blacklist, pause, airdrop, renounce...) is switched on later from the dashboard, so you're never locked into a decision at launch.</P>
       </>
     ),
   },
@@ -83,7 +83,7 @@ const SECTIONS: Section[] = [
           transfer, making the token deflationary.
         </P>
         <Callout tone="positive" icon={<IconShield className="h-4 w-4" />} title="Anti-rug guarantee">
-          The combined tax on any single trade can never exceed <b>25%</b> — that ceiling is enforced
+          The combined tax on any single trade can never exceed <b>25%</b> - that ceiling is enforced
           inside the contract, so not even the owner can set a malicious 99% honeypot tax.
         </Callout>
         <P>Adjust all three live with the sliders on the dashboard. Changes take effect on the next trade.</P>
@@ -96,12 +96,12 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          The contract can't magically know a transfer is a "buy" or "sell" — it recognises trades by
+          The contract can't magically know a transfer is a "buy" or "sell" - it recognises trades by
           the <b>liquidity pair address</b>. The flow is:
         </P>
         <Ol>
           <li>Deploy your token.</li>
-          <li>Add liquidity on a Base DEX (e.g. <b>Aerodrome</b> or <b>Uniswap</b>) — this creates a pair/pool address.</li>
+          <li>Add liquidity on a Base DEX (e.g. <b>Aerodrome</b> or <b>Uniswap</b>) - this creates a pair/pool address.</li>
           <li>On the dashboard's <b>DEX pairs</b> panel, paste that pair address and mark it as a pair.</li>
         </Ol>
         <P>From then on, transfers <i>from</i> the pair are taxed as buys and transfers <i>to</i> the pair as sells. Before you register a pair, the token behaves like a plain, untaxed ERC-20.</P>
@@ -115,7 +115,7 @@ const SECTIONS: Section[] = [
       <>
         <P>
           If you enabled minting, the <b>Supply</b> panel lets you create new tokens to any address.
-          If you set a <b>hard cap</b>, total supply can never exceed it — the contract rejects mints
+          If you set a <b>hard cap</b>, total supply can never exceed it - the contract rejects mints
           past the cap.
         </P>
         <P>
@@ -139,7 +139,7 @@ const SECTIONS: Section[] = [
         <P>
           Your owner and tax wallets are excluded automatically. Pools you mark as pairs are exempt
           from the max-wallet check (so liquidity can exceed it). Turn limits off entirely once the
-          token is established — a common post-launch step.
+          token is established - a common post-launch step.
         </P>
       </>
     ),
@@ -150,7 +150,7 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          A freshly deployed token starts with trading <b>closed</b> — only the owner and excluded
+          A freshly deployed token starts with trading <b>closed</b> - only the owner and excluded
           wallets can move tokens. This lets you add liquidity and configure everything before the
           public can trade. Hit <b>Enable trading</b> to go live (one-way, permanent).
         </P>
@@ -167,7 +167,7 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          <b>Blacklist</b> an address to instantly block it from sending or receiving — useful for
+          <b>Blacklist</b> an address to instantly block it from sending or receiving - useful for
           known bots or malicious actors. Un-blacklist just as easily.
         </P>
         <P>
@@ -175,7 +175,7 @@ const SECTIONS: Section[] = [
           can transfer. Handy for a private/allowlisted launch phase, then switch it off to open up.
         </P>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          These are powerful, centralised controls. Use them transparently — communities watch how
+          These are powerful, centralised controls. Use them transparently - communities watch how
           owners wield blacklists. Renouncing ownership disables them entirely.
         </Callout>
       </>
@@ -193,7 +193,7 @@ const SECTIONS: Section[] = [
         </P>
         <P>
           <b>Renounce ownership</b> sets the owner to the zero address, permanently. All admin
-          controls (tax, mint, blacklist, pause…) become frozen forever — the ultimate
+          controls (tax, mint, blacklist, pause...) become frozen forever - the ultimate
           decentralisation signal. There is no undo.
         </P>
       </>
@@ -252,7 +252,7 @@ npx hardhat verify --network base \\
     body: (
       <>
         <Ul>
-          <li>B20 is <b>non-custodial</b> — it never holds your keys, funds or ownership.</li>
+          <li>B20 is <b>non-custodial</b> - it never holds your keys, funds or ownership.</li>
           <li>Contracts are immutable once deployed. Rehearse on <b>Base Sepolia</b> first, every time.</li>
           <li>Owner powers (tax, blacklist, pause) are real. Renounce when you want to prove you can't abuse them.</li>
           <li>This tool and its docs are provided as-is and are not financial or legal advice. Launch responsibly and comply with your local regulations.</li>
@@ -287,7 +287,7 @@ export function Docs() {
         <Badge tone="accent" className="mb-3"><IconInfo className="h-3.5 w-3.5" /> Documentation</Badge>
         <h1 className="text-3xl font-semibold tracking-tight">How B20 works</h1>
         <p className="mt-2 max-w-2xl text-[15px] text-muted">
-          A guide to every feature — what it does, when to use it, and the safety rails built into each one.
+          A guide to every feature - what it does, when to use it, and the safety rails built into each one.
         </p>
       </header>
 

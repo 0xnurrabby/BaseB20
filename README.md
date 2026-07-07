@@ -2,7 +2,7 @@
 
 A no-code studio to **create** and **manage** gas-optimized ERC-20 tokens on the
 **Base** chain. Connect a wallet, configure a token (basic or advanced), deploy it
-in one transaction, then control everything live from an owner dashboard — taxes,
+in one transaction, then control everything live from an owner dashboard - taxes,
 limits, minting, blacklists, ownership, airdrops and more. Fully BaseScan-verifiable.
 
 ```
@@ -95,7 +95,7 @@ You can also deploy from the CLI with your own script if you prefer; the config 
 
 Base's Beryl upgrade introduces a **native** token standard also called B20, built as
 chain-level **precompiles** for regulated stablecoin / RWA issuers. It has compliance
-policies, freeze-and-seize and supply caps — but **no trading tax, max-wallet or
+policies, freeze-and-seize and supply caps - but **no trading tax, max-wallet or
 max-transaction** mechanics, and (as precompiles) nothing to verify on BaseScan.
 
 This studio deploys a classic, audited-component Solidity ERC-20 instead, so you get
@@ -108,7 +108,7 @@ native-token path can be added alongside this one.
 ## Security
 
 - **Non-custodial.** The app never holds your keys, funds, or ownership.
-- Contracts are immutable once deployed — test on Sepolia every time.
+- Contracts are immutable once deployed - test on Sepolia every time.
 - The 25% tax ceiling is enforced in the contract; the owner cannot exceed it.
 - Owner powers (blacklist, pause, tax) are real centralised controls. Renounce
   ownership to prove they can never be used.

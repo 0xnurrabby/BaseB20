@@ -1,13 +1,12 @@
-import { useRef, useState } from "react";
-import { ACCEPTED_IMAGE_TYPES, isUploadConfigured, uploadImage } from "../lib/upload";
-import { Button, CopyButton, Input, cn } from "./ui";
-import { IconCheck, IconExternal, IconLoader, IconX } from "./icons";
+import { useEffect, useRef, useState } from "react";
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES, uploadImage } from "../lib/upload";
+import { Button, cn } from "./ui";
+import { IconCheck, IconLoader, IconX } from "./icons";
 
 /**
- * Click-to-upload token logo. The user clicks the avatar, picks an image from
- * their device gallery, and it's uploaded to imgbb automatically — the returned
- * URL is written back via onChange and later stored on-chain as logoURI.
- * A manual URL field remains as a fallback / for advanced users.
+ * Token logo picker. The user selects an image, previews it, then saves it to
+ * ImgBB. The uploaded URL is written back through onChange and later stored
+ * on-chain as logoURI.
  */
 export function LogoPicker({
   value,
@@ -23,15 +22,48 @@ export function LogoPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "done">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [showUrl, setShowUrl] = useState(false);
-  const configured = isUploadConfigured();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  async function handleFile(file: File | undefined) {
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function handleFile(file: File | undefined) {
     if (!file) return;
+    setUploadError(null);
+    setStatus("idle");
+
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError("Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError("Image is too large. Keep it under 5 MB.");
+      return;
+    }
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function openPicker() {
+    if (status === "uploading") return;
+    inputRef.current?.click();
+  }
+
+  async function saveImage() {
+    if (!selectedFile) return;
     setUploadError(null);
     setStatus("uploading");
     try {
-      const res = await uploadImage(file);
+      const res = await uploadImage(selectedFile);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setSelectedFile(null);
       onChange(res.url);
       setStatus("done");
       setTimeout(() => setStatus("idle"), 1600);
@@ -41,38 +73,38 @@ export function LogoPicker({
     }
   }
 
-  function openPicker() {
-    if (status === "uploading") return;
-    inputRef.current?.click();
+  function clearImage() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setSelectedFile(null);
+    setUploadError(null);
+    setStatus("idle");
+    if (!selectedFile) onChange("");
   }
+
+  const preview = previewUrl || value;
 
   return (
     <div>
       <div className="flex items-center gap-4">
-        {/* Clickable avatar */}
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={status === "uploading"}
-          title={configured ? "Click to choose a logo" : "Upload not configured — paste a URL below"}
+        <div
+          aria-label="Token logo preview"
           className={cn(
-            "group relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-elevated transition",
-            "hover:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
+            "relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-elevated",
             status === "uploading" && "cursor-wait opacity-70"
           )}
         >
-          {value ? (
-            <>
+          {preview ? (
+            status === "uploading" ? (
+              <IconLoader className="h-6 w-6 text-muted" />
+            ) : (
               <img
-                src={value}
+                src={preview}
                 alt="Token logo"
                 className="h-full w-full object-cover"
                 onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")}
               />
-              <span className="absolute inset-0 hidden place-items-center bg-black/50 text-[11px] font-medium text-white group-hover:grid">
-                Change
-              </span>
-            </>
+            )
           ) : status === "uploading" ? (
             <IconLoader className="h-6 w-6 text-muted" />
           ) : (
@@ -81,45 +113,37 @@ export function LogoPicker({
               <span className="text-[10px] font-medium">{symbol ? symbol.slice(0, 4) : "Logo"}</span>
             </span>
           )}
-        </button>
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" variant="secondary" onClick={openPicker} loading={status === "uploading"}>
-              {status === "uploading" ? "Uploading…" : value ? "Change image" : "Choose image"}
+              {selectedFile || value ? "Change image" : "Choose image"}
             </Button>
-            {value && status !== "uploading" && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={saveImage}
+              loading={status === "uploading"}
+              disabled={!selectedFile || status === "uploading"}
+            >
+              Save
+            </Button>
+            {(selectedFile || value) && status !== "uploading" && (
               <button
                 type="button"
-                onClick={() => {
-                  onChange("");
-                  setUploadError(null);
-                }}
+                onClick={clearImage}
                 className="inline-flex items-center gap-1 rounded-lg border border-border bg-elevated px-2.5 py-1 text-xs text-muted transition hover:text-negative"
               >
-                <IconX className="h-3.5 w-3.5" /> Remove
+                <IconX className="h-3.5 w-3.5" /> {selectedFile ? "Cancel" : "Remove"}
               </button>
             )}
             {status === "done" && (
               <span className="inline-flex items-center gap-1 text-xs text-positive">
-                <IconCheck className="h-3.5 w-3.5" /> Uploaded
+                <IconCheck className="h-3.5 w-3.5" /> Saved
               </span>
             )}
           </div>
-          <p className="mt-1.5 text-xs text-faint">
-            {configured
-              ? "PNG, JPG, GIF, WEBP or SVG · up to 5 MB. Hosted automatically."
-              : "Upload isn't configured — paste an image URL below."}
-          </p>
-          {value && (
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <code className="truncate rounded bg-elevated px-1.5 py-0.5 font-mono text-[11px] text-muted">{value}</code>
-              <CopyButton value={value} label="" />
-              <a href={value} target="_blank" rel="noreferrer" className="text-faint hover:text-fg">
-                <IconExternal className="h-3.5 w-3.5" />
-              </a>
-            </div>
-          )}
         </div>
       </div>
 
@@ -130,30 +154,11 @@ export function LogoPicker({
         className="hidden"
         onChange={(e) => {
           handleFile(e.target.files?.[0]);
-          e.target.value = ""; // allow re-selecting the same file
+          e.target.value = "";
         }}
       />
 
       {(uploadError || error) && <p className="mt-2 text-xs text-negative">{uploadError ?? error}</p>}
-
-      {/* Manual URL fallback */}
-      <div className="mt-3">
-        <button
-          type="button"
-          onClick={() => setShowUrl((v) => !v)}
-          className="text-xs font-medium text-muted underline-offset-2 hover:text-fg hover:underline"
-        >
-          {showUrl ? "Hide URL field" : "Or paste an image URL"}
-        </button>
-        {showUrl && (
-          <Input
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="https://…/logo.png or ipfs://…"
-            className="mt-2 font-mono text-xs"
-          />
-        )}
-      </div>
     </div>
   );
 }

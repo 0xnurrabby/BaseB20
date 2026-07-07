@@ -103,17 +103,17 @@ export function Create() {
     const e: Partial<Record<string, string>> = {};
     if (!f.name.trim()) e.name = "Name is required";
     if (!f.symbol.trim()) e.symbol = "Symbol is required";
-    else if (f.symbol.trim().length > 11) e.symbol = "Keep the symbol ≤ 11 characters";
+    else if (f.symbol.trim().length > 11) e.symbol = "Keep the symbol at 11 characters or less";
     if (!Number.isFinite(supplyNum) || supplyNum <= 0) e.supply = "Enter a supply greater than 0";
     else if (!Number.isInteger(supplyNum)) e.supply = "Supply must be a whole number";
-    if (!Number.isInteger(decimalsNum) || decimalsNum < 0 || decimalsNum > 18) e.decimals = "0–18";
+    if (!Number.isInteger(decimalsNum) || decimalsNum < 0 || decimalsNum > 18) e.decimals = "0-18";
     if (f.capped) {
       if (!Number.isFinite(maxSupplyNum) || maxSupplyNum <= 0) e.maxSupply = "Enter a max supply";
-      else if (maxSupplyNum < supplyNum) e.maxSupply = "Max supply must be ≥ initial supply";
+      else if (maxSupplyNum < supplyNum) e.maxSupply = "Max supply must be at least initial supply";
     }
     if (f.taxEnabled) {
-      if (f.buyTax + f.burnTax > 25) e.buyTax = "Buy + burn tax must be ≤ 25%";
-      if (f.sellTax + f.burnTax > 25) e.sellTax = "Sell + burn tax must be ≤ 25%";
+      if (f.buyTax + f.burnTax > 25) e.buyTax = "Buy + burn tax must be at most 25%";
+      if (f.sellTax + f.burnTax > 25) e.sellTax = "Sell + burn tax must be at most 25%";
       if (f.taxWallet && !isAddressLike(f.taxWallet)) e.taxWallet = "Not a valid address";
     }
     if (f.logoURI && !/^(https?|ipfs):\/\//.test(f.logoURI)) e.logoURI = "Use an https:// or ipfs:// URL";
@@ -249,7 +249,7 @@ export function Create() {
                   />
                 </Field>
                 <div className="sm:col-span-2">
-                  <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="Optional. Stored on-chain for wallets & explorers.">
+                  <Field label="Logo" error={err("logoURI", errors.logoURI)}>
                     <LogoPicker value={f.logoURI} onChange={(url) => set("logoURI", url)} symbol={f.symbol} />
                   </Field>
                 </div>
@@ -274,10 +274,10 @@ export function Create() {
                   <div className="space-y-5">
                     <TaxSlider label="Buy tax" tone="positive" icon={<IconTrendUp className="h-4 w-4 text-positive" />} value={f.buyTax} onChange={(v) => set("buyTax", v)} error={errors.buyTax} />
                     <TaxSlider label="Sell tax" tone="negative" icon={<IconTrendDown className="h-4 w-4 text-negative" />} value={f.sellTax} onChange={(v) => set("sellTax", v)} error={errors.sellTax} />
-                    {/* tax errors always show — they reflect an active misconfiguration, not a pristine field */}
+                    {/* tax errors always show - they reflect an active misconfiguration, not a pristine field */}
                     <TaxSlider label="Burn on transfer" tone="neutral" icon={<IconFlame className="h-4 w-4" />} value={f.burnTax} onChange={(v) => set("burnTax", v)} hint="Burned on every non-exempt transfer (deflationary)." />
                     <Field label="Tax collector wallet" error={err("taxWallet", errors.taxWallet)} hint="Where buy/sell tax is sent. Defaults to your wallet.">
-                      <Input value={f.taxWallet} onChange={(e) => set("taxWallet", e.target.value)} placeholder={address ?? "0x…"} className="font-mono text-xs" />
+                      <Input value={f.taxWallet} onChange={(e) => set("taxWallet", e.target.value)} placeholder={address ?? "0x..."} className="font-mono text-xs" />
                     </Field>
                     <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
                       Buy/sell tax only applies once you register your DEX pair in the dashboard after adding liquidity.
@@ -305,7 +305,7 @@ export function Create() {
                       <Switch checked={f.capped} onChange={(v) => set("capped", v)} label="Cap supply" />
                     </div>
                     {f.capped && (
-                      <Field label="Max supply" error={err("maxSupply", errors.maxSupply)} hint={maxSupplyNum > 0 ? `${commafy(maxSupplyNum)} tokens` : "Whole tokens, ≥ initial supply"}>
+                      <Field label="Max supply" error={err("maxSupply", errors.maxSupply)} hint={maxSupplyNum > 0 ? `${commafy(maxSupplyNum)} tokens` : "Whole tokens, at least initial supply"}>
                         <Input
                           inputMode="numeric"
                           value={f.maxSupply}
@@ -315,7 +315,7 @@ export function Create() {
                       </Field>
                     )}
                     <Callout tone="neutral" icon={<IconFlame className="h-4 w-4" />}>
-                      You can permanently disable minting anytime from the dashboard — a strong trust signal for holders.
+                      You can permanently disable minting anytime from the dashboard - a strong trust signal for holders.
                     </Callout>
                   </div>
                 ) : (
@@ -327,7 +327,7 @@ export function Create() {
               <SectionCard
                 icon={<IconUsers className="h-5 w-5" />}
                 title="Anti-whale limits"
-                desc="Cap how much a single wallet can hold or move — stops snipers dumping."
+                desc="Cap how much a single wallet can hold or move - stops snipers dumping."
                 action={<Switch checked={f.limitsEnabled} onChange={(v) => set("limitsEnabled", v)} label="Enable limits" />}
               >
                 {f.limitsEnabled ? (
@@ -370,7 +370,7 @@ export function Create() {
             ) : (
               <Button size="lg" fullWidth loading={isPending || isMining} onClick={onDeploy} className="gap-2">
                 <IconRocket className="h-5 w-5" />
-                {isPending ? "Confirm in wallet…" : isMining ? "Deploying…" : "Deploy token"}
+                {isPending ? "Confirm in wallet..." : isMining ? "Deploying..." : "Deploy token"}
               </Button>
             )}
             {hasErrors && isConnected && supported && (
@@ -456,7 +456,7 @@ function PreviewCard({ f, supplyNum }: { f: FormState; supplyNum: number }) {
         </div>
       </div>
       <div className="space-y-2.5 px-5 py-4 text-sm">
-        <Row label="Supply" value={supplyNum > 0 ? commafy(supplyNum) : "—"} />
+        <Row label="Supply" value={supplyNum > 0 ? commafy(supplyNum) : "-"} />
         <Row label="Decimals" value={f.decimals || "18"} />
         {f.taxEnabled && <Row label="Buy / Sell tax" value={`${f.buyTax}% / ${f.sellTax}%`} />}
         {f.taxEnabled && f.burnTax > 0 && <Row label="Burn / transfer" value={`${f.burnTax}%`} />}
@@ -549,7 +549,7 @@ function SuccessModal({
           </details>
 
           <p className="text-center text-[11px] text-faint">
-            Saved to your local token list — find it anytime on the dashboard.
+            Saved to your local token list - find it anytime on the dashboard.
           </p>
         </div>
       )}

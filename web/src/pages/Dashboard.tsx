@@ -189,7 +189,7 @@ export function Dashboard() {
               <Input
                 value={manual}
                 onChange={(e) => setManual(e.target.value.trim())}
-                placeholder="0x…"
+                placeholder="0x..."
                 className="font-mono text-sm"
                 onKeyDown={(e) => e.key === "Enter" && openToken(manual)}
               />
@@ -244,7 +244,7 @@ export function Dashboard() {
   if (isLoading || (!token && !isError)) {
     return (
       <Centered>
-        <div className="animate-pulse text-sm text-muted">Loading token…</div>
+        <div className="animate-pulse text-sm text-muted">Loading token...</div>
       </Centered>
     );
   }
@@ -436,7 +436,7 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
           Update
         </TxButton>
       </div>
-      {!ok && <p className="mt-1 text-xs text-negative">Combined with burn tax must be ≤ 25%.</p>}
+      {!ok && <p className="mt-1 text-xs text-negative">Combined with burn tax must be at most 25%.</p>}
     </div>
   );
 
@@ -493,7 +493,7 @@ function TradingPanel({ token, isOwner, refetch }: Ctx) {
           <div className="flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-3">
             <div>
               <p className="text-sm font-medium">{token.tradingPaused ? "Trading paused" : "Trading live"}</p>
-              <p className="text-xs text-muted">Emergency switch — pause all non-exempt transfers.</p>
+              <p className="text-xs text-muted">Emergency switch - pause all non-exempt transfers.</p>
             </div>
             <TxButton
               size="sm"
@@ -528,7 +528,7 @@ function SupplyPanel({ token, isOwner, refetch }: Ctx) {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
             <Field label="Recipient">
-              <Input value={to} onChange={(e) => setTo(e.target.value.trim())} placeholder="0x…" className="font-mono text-xs" disabled={!canMint} />
+              <Input value={to} onChange={(e) => setTo(e.target.value.trim())} placeholder="0x..." className="font-mono text-xs" disabled={!canMint} />
             </Field>
             <Field label="Amount">
               <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))} placeholder="1000" disabled={!canMint} />
@@ -623,7 +623,7 @@ function PairsPanel({ token, isOwner, refetch }: Ctx) {
         After adding liquidity on a DEX (e.g. Aerodrome/Uniswap), paste the <strong>pair/pool address</strong> and mark it as a pair.
       </Callout>
       <Field label="Pair address">
-        <Input value={pair} onChange={(e) => setPair(e.target.value.trim())} placeholder="0x…" className="font-mono text-xs" disabled={!isOwner} />
+        <Input value={pair} onChange={(e) => setPair(e.target.value.trim())} placeholder="0x..." className="font-mono text-xs" disabled={!isOwner} />
       </Field>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <TxButton variant="secondary" disabled={!isOwner || !valid} build={() => ({ address: token.address, abi: B20_ABI, functionName: "setAMMPair", args: [pair as `0x${string}`, true] })} onSuccess={() => { setPair(""); refetch(); }}>
@@ -644,7 +644,7 @@ function AccessPanel({ token, isOwner, refetch }: Ctx) {
     <SectionCard icon={<IconBan className="h-5 w-5" />} title="Blacklist & whitelist" desc="Block bad actors, or run a strict allowlist.">
       <div className="space-y-4">
         <Field label="Account address">
-          <Input value={addr} onChange={(e) => setAddr(e.target.value.trim())} placeholder="0x…" className="font-mono text-xs" disabled={!isOwner} />
+          <Input value={addr} onChange={(e) => setAddr(e.target.value.trim())} placeholder="0x..." className="font-mono text-xs" disabled={!isOwner} />
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <TxButton variant="danger" disabled={!isOwner || !valid} build={() => ({ address: token.address, abi: B20_ABI, functionName: "setBlacklist", args: [addr as `0x${string}`, true] })} onSuccess={refetch}>
@@ -732,7 +732,7 @@ function OwnershipPanel({ token, isOwner, refetch, isPendingOwner }: Ctx & { isP
     <SectionCard danger icon={<IconShield className="h-5 w-5" />} title="Ownership" desc="Transfer control (2-step) or renounce it entirely.">
       {renounced ? (
         <Callout tone="positive" icon={<IconShield className="h-4 w-4" />}>
-          Ownership is <strong>renounced</strong>. No one can change this token's settings — fully decentralized.
+          Ownership is <strong>renounced</strong>. No one can change this token's settings - fully decentralized.
         </Callout>
       ) : (
         <div className="space-y-4">
@@ -750,7 +750,7 @@ function OwnershipPanel({ token, isOwner, refetch, isPendingOwner }: Ctx & { isP
           )}
           <Field label="Transfer ownership to" hint="New owner must accept in a second transaction.">
             <div className="flex gap-2">
-              <Input value={newOwner} onChange={(e) => setNewOwner(e.target.value.trim())} placeholder="0x…" className="font-mono text-xs" disabled={!isOwner} />
+              <Input value={newOwner} onChange={(e) => setNewOwner(e.target.value.trim())} placeholder="0x..." className="font-mono text-xs" disabled={!isOwner} />
               <TxButton variant="secondary" disabled={!isOwner || !valid} build={() => ({ address: token.address, abi: B20_ABI, functionName: "transferOwnership", args: [newOwner as `0x${string}`] })} onSuccess={() => { setNewOwner(""); refetch(); }}>
                 Transfer
               </TxButton>
@@ -789,7 +789,7 @@ function RescuePanel({ token, isOwner, refetch }: Ctx) {
     <SectionCard icon={<IconLifebuoy className="h-5 w-5" />} title="Rescue stuck funds" desc="Recover tokens or ETH accidentally sent to the contract.">
       <div className="space-y-3">
         <Field label="Foreign token address">
-          <Input value={tokenAddr} onChange={(e) => setTokenAddr(e.target.value.trim())} placeholder="0x… (not this token)" className="font-mono text-xs" disabled={!isOwner} />
+          <Input value={tokenAddr} onChange={(e) => setTokenAddr(e.target.value.trim())} placeholder="0x... (not this token)" className="font-mono text-xs" disabled={!isOwner} />
         </Field>
         <Field label="Amount (18 decimals)" hint="Enter the human amount to pull back to the owner.">
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))} placeholder="1000" disabled={!isOwner} />

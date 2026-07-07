@@ -1,9 +1,9 @@
 import { formatUnits } from "viem";
 
-/** Shorten an address: 0x1234…abcd */
+/** Shorten an address: 0x1234...abcd */
 export function shortAddress(addr?: string, size = 4): string {
   if (!addr) return "";
-  return `${addr.slice(0, 2 + size)}…${addr.slice(-size)}`;
+  return `${addr.slice(0, 2 + size)}...${addr.slice(-size)}`;
 }
 
 /** basis points -> percent number (250 -> 2.5) */
@@ -22,7 +22,7 @@ export function formatAmount(
   decimals: number,
   maxFrac = 4
 ): string {
-  if (value === undefined) return "—";
+  if (value === undefined) return "-";
   const raw = formatUnits(value, decimals);
   const n = Number(raw);
   if (!Number.isFinite(n)) return raw;
@@ -35,7 +35,7 @@ export function formatAmount(
 
 /** Full precision formatting (no compaction). */
 export function formatFull(value: bigint | undefined, decimals: number): string {
-  if (value === undefined) return "—";
+  if (value === undefined) return "-";
   const raw = formatUnits(value, decimals);
   const n = Number(raw);
   if (!Number.isFinite(n)) return raw;

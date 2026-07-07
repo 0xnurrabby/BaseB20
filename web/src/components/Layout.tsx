@@ -138,22 +138,13 @@ function NetworkBanner() {
 function Footer() {
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6">
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <Logo withText={false} />
-          <span>
-            B20 · Non-custodial token studio for <strong className="text-fg">Base</strong>
-          </span>
-        </div>
+      <div className="mx-auto flex max-w-6xl items-center justify-center px-4 py-8 sm:px-6">
         <div className="flex items-center gap-5 text-xs text-faint">
           <Link to="/docs" className="hover:text-fg">Docs</Link>
           <a href="https://basescan.org" target="_blank" rel="noreferrer" className="hover:text-fg">BaseScan</a>
           <a href="https://base.org" target="_blank" rel="noreferrer" className="hover:text-fg">base.org</a>
         </div>
       </div>
-      <p className="pb-6 text-center text-[11px] text-faint">
-        Smart contracts are immutable and interact with real value. Always test on Base Sepolia first. Not financial advice.
-      </p>
     </footer>
   );
 }

@@ -36,7 +36,7 @@ export interface UploadResult {
 
 /** Validate + upload an image file to imgbb. Throws with a friendly message on failure. */
 export async function uploadImage(file: File): Promise<UploadResult> {
-  if (!IMGBB_KEY) throw new Error("Image upload isn't configured. Paste a logo URL instead.");
+  if (!IMGBB_KEY) throw new Error("Image upload is not configured.");
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
     throw new Error("Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG.");
   }
@@ -53,7 +53,7 @@ export async function uploadImage(file: File): Promise<UploadResult> {
   try {
     res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(IMGBB_KEY)}`, { method: "POST", body });
   } catch {
-    throw new Error("Upload failed — check your connection and try again.");
+    throw new Error("Upload failed - check your connection and try again.");
   }
 
   if (!res.ok) {

@@ -45,7 +45,7 @@ export function buildVerifyArgs(cfg: TokenConfigInput): string {
     maxWalletTokens: cfg.maxWalletTokens.toString(),
     logoURI_: cfg.logoURI_,
   };
-  return `// arguments.js — constructor args for BaseScan verification\nmodule.exports = [\n  ${JSON.stringify(tuple, null, 2).replace(/\n/g, "\n  ")},\n];\n`;
+  return `// arguments.js - constructor args for BaseScan verification\nmodule.exports = [\n  ${JSON.stringify(tuple, null, 2).replace(/\n/g, "\n  ")},\n];\n`;
 }
 
 /** The exact CLI command to verify a deployed token. */
