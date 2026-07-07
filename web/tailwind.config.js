@@ -20,6 +20,7 @@ export default {
       },
       fontFamily: {
         sans: [
+          "Plus Jakarta Sans",
           "Inter",
           "ui-sans-serif",
           "system-ui",
@@ -29,6 +30,11 @@ export default {
           "Helvetica Neue",
           "Arial",
           "sans-serif",
+        ],
+        display: [
+          "DM Serif Display",
+          "Georgia",
+          "serif",
         ],
         mono: [
           "ui-monospace",
