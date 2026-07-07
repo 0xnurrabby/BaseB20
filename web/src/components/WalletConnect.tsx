@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatUnits } from "viem";
 import { useAccount, useBalance, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { baseSepolia } from "wagmi/chains";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
@@ -141,7 +142,7 @@ function AccountModal({
           <div className="mt-3 flex items-center justify-between text-xs text-muted">
             <span>{connectorName ?? "Connected"}</span>
             <span>
-              {balance ? `${Number(balance.formatted).toFixed(4)} ${balance.symbol}` : "-"}
+              {balance ? `${Number(formatUnits(balance.value, balance.decimals)).toFixed(4)} ${balance.symbol}` : "-"}
             </span>
           </div>
         </div>
