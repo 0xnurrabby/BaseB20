@@ -41,7 +41,7 @@ export function LogoPicker({
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setUploadError("Image is too large. Keep it under 5 MB.");
+      setUploadError("Image is too large. Keep it under 3 MB.");
       return;
     }
 

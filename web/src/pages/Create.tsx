@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccount, useChainId, useDeployContract, useWaitForTransactionReceipt } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
 import { B20_ABI, B20_BYTECODE, buildVerifyArgs, verifyCommand, type TokenConfigInput } from "../lib/contract";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
 import { commafy, isAddressLike } from "../lib/format";
@@ -365,7 +364,7 @@ export function Create() {
               </Card>
             ) : !supported ? (
               <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />} title="Wrong network">
-                Switch to Base or Base Sepolia from the wallet menu.
+                Switch to Base Sepolia from the wallet menu.
               </Callout>
             ) : (
               <Button size="lg" fullWidth loading={isPending || isMining} onClick={onDeploy} className="gap-2">
@@ -498,9 +497,9 @@ function SuccessModal({
   chainId: number;
   cfg: TokenConfigInput | null;
 }) {
-  const net = chainId === baseSepolia.id ? "baseSepolia" : "base";
+  const net = "baseSepolia";
   return (
-    <Modal open={open} onClose={onClose} title="🎉 Token deployed" size="md">
+    <Modal open={open} onClose={onClose} title="Token deployed" size="md">
       {address && cfg && (
         <div className="space-y-5">
           <div className="rounded-xl border border-positive/30 bg-positive/[0.06] px-4 py-4 text-center">

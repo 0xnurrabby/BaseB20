@@ -129,8 +129,7 @@ function NetworkBanner() {
   if (isSupportedChain(chainId)) return null;
   return (
     <div className="border-b border-negative/30 bg-negative/10 px-4 py-2 text-center text-xs text-negative">
-      You're connected to an unsupported network. Switch to <strong>Base</strong> or{" "}
-      <strong>Base Sepolia</strong> to continue.
+      You're connected to an unsupported network. Switch to <strong>Base Sepolia</strong> to continue.
     </div>
   );
 }
@@ -141,7 +140,7 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl items-center justify-center px-4 py-8 sm:px-6">
         <div className="flex items-center gap-5 text-xs text-faint">
           <Link to="/docs" className="hover:text-fg">Docs</Link>
-          <a href="https://basescan.org" target="_blank" rel="noreferrer" className="hover:text-fg">BaseScan</a>
+          <a href="https://sepolia.basescan.org" target="_blank" rel="noreferrer" className="hover:text-fg">BaseScan</a>
           <a href="https://base.org" target="_blank" rel="noreferrer" className="hover:text-fg">base.org</a>
         </div>
       </div>

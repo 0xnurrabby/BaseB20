@@ -235,7 +235,7 @@ export function Dashboard() {
     return (
       <Centered>
         <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />} title="Wrong network">
-          Switch to Base or Base Sepolia to manage this token.
+          Switch to Base Sepolia to manage this token.
         </Callout>
       </Centered>
     );

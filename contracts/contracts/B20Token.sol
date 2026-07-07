@@ -29,7 +29,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *
  * @dev Uses custom errors and tightly packed storage. Tax/flag config lives in a
  *      single 256-bit slot. Base's *native* B20 precompile standard is a separate,
- *      compliance-focused system with no tax mechanism — see the app Docs.
+ *      compliance-focused system with no tax mechanism. See the app Docs.
  */
 contract B20Token is ERC20, ERC20Burnable, ERC20Permit, Ownable2Step {
     // --------------------------------------------------------------------- //
@@ -425,7 +425,7 @@ contract B20Token is ERC20, ERC20Burnable, ERC20Permit, Ownable2Step {
     //                          Trading controls                             //
     // --------------------------------------------------------------------- //
 
-    /// @notice Open trading to everyone. One-way — cannot be undone.
+    /// @notice Open trading to everyone. One-way and cannot be undone.
     function enableTrading() external onlyOwner {
         if (tradingActive) revert AlreadyLive();
         tradingActive = true;

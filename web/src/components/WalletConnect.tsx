@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAccount, useBalance, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { base, baseSepolia } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
 import { shortAddress } from "../lib/format";
 import { Badge, Button, CopyButton, Divider, Modal } from "./ui";
@@ -96,7 +96,7 @@ function ConnectModal({ open, onClose }: { open: boolean; onClose: () => void })
       </div>
       {error && <p className="mt-3 text-xs text-negative">{error.message}</p>}
       <p className="mt-4 text-center text-[11px] text-faint">
-        By connecting, you agree to interact with public smart contracts on Base. B20 never holds your keys.
+        By connecting, you agree to interact with public smart contracts on Base Sepolia. B20 never holds your keys.
       </p>
     </Modal>
   );
@@ -150,21 +150,14 @@ function AccountModal({
           <p className="mb-2 text-[13px] font-medium">Network</p>
           {!supported && (
             <p className="mb-2 text-xs text-negative">
-              You're on an unsupported network. Switch to Base to use B20.
+              You're on an unsupported network. Switch to Base Sepolia to use B20.
             </p>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant={chainId === base.id ? "primary" : "outline"}
-              size="sm"
-              loading={isPending}
-              onClick={() => switchChain({ chainId: base.id })}
-            >
-              Base
-            </Button>
+          <div>
             <Button
               variant={chainId === baseSepolia.id ? "primary" : "outline"}
               size="sm"
+              fullWidth
               loading={isPending}
               onClick={() => switchChain({ chainId: baseSepolia.id })}
             >

@@ -49,6 +49,6 @@ export function buildVerifyArgs(cfg: TokenConfigInput): string {
 }
 
 /** The exact CLI command to verify a deployed token. */
-export function verifyCommand(address: string, network: "base" | "baseSepolia"): string {
+export function verifyCommand(address: string, network: "baseSepolia"): string {
   return `npx hardhat verify --network ${network} --constructor-args arguments.js ${address}`;
 }

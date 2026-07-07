@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "B20 — Base Token Creator & Manager frontend.",
+  "description": "B20 - Base Token Creator & Manager frontend.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

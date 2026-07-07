@@ -16,8 +16,8 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          <b>B20</b> is a no-code studio for launching and running ERC-20 tokens on the{" "}
-          <b>Base</b> chain. You configure a token in the browser, deploy it with a single wallet
+          <b>B20</b> is a no-code studio for launching and running ERC-20 tokens on{" "}
+          <b>Base Sepolia</b>. You configure a token in the browser, deploy it with a single wallet
           transaction, and then manage every setting live from the dashboard - taxes, limits,
           minting, blacklists, ownership and more.
         </P>
@@ -30,8 +30,9 @@ const SECTIONS: Section[] = [
           upgrade). That one is implemented as chain-level <b>precompiles</b> aimed at regulated
           stablecoin / real-world-asset issuers - it has compliance policies, freeze-and-seize and
           supply caps, but <b>no trading tax, max-wallet or max-transaction</b> features, and its
-          mainnet rollout is staged. This studio instead deploys a classic Solidity ERC-20 so you get
-          taxes, anti-whale limits and instant BaseScan verification today. Same spirit, different
+          mainnet rollout is currently paused. This studio is Base Sepolia-only for now and deploys
+          a classic Solidity ERC-20 so you get taxes, anti-whale limits and BaseScan verification
+          today. Same spirit, different
           engine - pick this when you want a tradeable community token.
         </Callout>
       </>
@@ -44,12 +45,12 @@ const SECTIONS: Section[] = [
       <>
         <Ol>
           <li><b>Connect a wallet</b> (MetaMask, Rabby, Coinbase Wallet...) from the top-right button.</li>
-          <li><b>Pick a network.</b> Always rehearse on <b>Base Sepolia</b> (testnet) first - it's free.</li>
-          <li>Grab test ETH from a Base Sepolia faucet, then deploy for real on <b>Base</b> when you're happy.</li>
+          <li><b>Pick a network.</b> Use <b>Base Sepolia</b> (testnet). It is the only network enabled right now.</li>
+          <li>Grab test ETH from a Base Sepolia faucet, then create and test your token there.</li>
         </Ol>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Deploying is irreversible and costs real ETH on mainnet. Test on Sepolia until the token
-          behaves exactly how you want.
+          The website is currently Sepolia-only. Do not send mainnet funds until Base mainnet support
+          is enabled again.
         </Callout>
       </>
     ),
@@ -240,7 +241,7 @@ const SECTIONS: Section[] = [
 export BASESCAN_API_KEY=your_key
 
 # 2. save the arguments.js shown after deploy, then:
-npx hardhat verify --network base \\
+npx hardhat verify --network baseSepolia \\
   --constructor-args arguments.js <TOKEN_ADDRESS>`}</Pre>
         <P>Once verified, holders see a green checkmark and can read every line of your token's code.</P>
       </>
@@ -322,7 +323,7 @@ export function Docs() {
           <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-semibold text-fg">Ready to launch?</h3>
-              <p className="mt-1 text-sm text-muted">Rehearse on Base Sepolia, then go live on Base.</p>
+              <p className="mt-1 text-sm text-muted">Create and test on Base Sepolia.</p>
             </div>
             <Link to="/create" className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-accent-fg hover:opacity-90">
               Create a token <IconArrowRight className="h-4 w-4" />

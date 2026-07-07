@@ -1,124 +1,120 @@
-# B20 · Base Token Creator & Manager
+# B20 - Base Token Creator & Manager
 
-A no-code studio to **create** and **manage** gas-optimized ERC-20 tokens on the
-**Base** chain. Connect a wallet, configure a token (basic or advanced), deploy it
-in one transaction, then control everything live from an owner dashboard - taxes,
-limits, minting, blacklists, ownership, airdrops and more. Fully BaseScan-verifiable.
+A no-code studio to create and manage gas-optimized ERC-20 tokens on Base Sepolia.
+Connect a wallet, configure a token, deploy it in one transaction, then control
+settings live from an owner dashboard: taxes, limits, minting, blacklists,
+ownership, airdrops and more. Fully BaseScan-verifiable.
 
 ```
 BaseB20/
-├─ contracts/     # Hardhat + Solidity (the B20Token contract)
-└─ web/           # Vite + React + TypeScript + wagmi frontend
+  contracts/  # Hardhat + Solidity (the B20Token contract)
+  web/        # Vite + React + TypeScript + wagmi frontend
+  api/        # Vercel serverless helpers
 ```
-
----
 
 ## Features
 
 **Create (no code):**
+
 - Name, symbol, supply, decimals, on-chain logo URL
-- Buy / sell tax + burn-on-transfer (combined tax hard-capped at **25%** on-chain)
+- Buy / sell tax + burn-on-transfer (combined tax hard-capped at 25% on-chain)
 - Optional minting with a permanent hard cap
-- Anti-whale limits: max transaction & max wallet
+- Anti-whale limits: max transaction and max wallet
 - The full supply is minted to you; you become the owner
 
 **Manage (live dashboard):**
-- Buy/sell/burn tax **sliders** (25% ceiling enforced in the contract)
+
+- Buy/sell/burn tax sliders (25% ceiling enforced in the contract)
 - Change the tax collector wallet
-- Mint tokens, or **disable minting forever**
-- Enable trading (one-way launch gate) + emergency **pause**
+- Mint tokens, or disable minting forever
+- Enable trading (one-way launch gate) + emergency pause
 - Register DEX pairs so buy/sell tax applies to trades
-- **Blacklist** bots/scammers; strict **whitelist** mode
-- Toggle & retune anti-whale limits
-- **Batch airdrop** to many wallets in one transaction
-- **Rescue** foreign tokens / ETH stuck in the contract
-- 2-step **ownership transfer** or **renounce**
+- Blacklist bots/scammers; strict whitelist mode
+- Toggle and retune anti-whale limits
+- Batch airdrop to many wallets in one transaction
+- Rescue foreign tokens / ETH stuck in the contract
+- 2-step ownership transfer or renounce
 
----
-
-## Quick start
+## Quick Start
 
 ### 1. Contract
 
 ```bash
 cd contracts
 npm install
-npm run build      # compiles + exports ABI/bytecode into web/src/contracts
+npm run build
 ```
 
-`npm run build` writes `web/src/contracts/B20Token.json` (already generated). Re-run
-it whenever you change the Solidity.
+`npm run build` compiles the contract and exports ABI/bytecode into
+`web/src/contracts/B20Token.json`. Re-run it whenever you change Solidity.
 
-### 2. Web app
+### 2. Web App
 
 ```bash
 cd web
 npm install
-cp .env.example .env   # optional: add a WalletConnect project id
-npm run dev            # http://localhost:5173
+cp .env.example .env
+npm run dev
 ```
 
 Build for production with `npm run build` (output in `web/dist`).
 
----
+## Network
 
-## Networks
+The website is currently enabled only for Base Sepolia while Base mainnet B20 is
+paused.
 
-| Network       | Chain ID | RPC                        | Explorer                       |
-| ------------- | -------- | -------------------------- | ------------------------------ |
-| Base mainnet  | `8453`   | https://mainnet.base.org   | https://basescan.org           |
-| Base Sepolia  | `84532`  | https://sepolia.base.org   | https://sepolia.basescan.org   |
+| Network      | Chain ID | RPC                      | Explorer                     |
+| ------------ | -------- | ------------------------ | ---------------------------- |
+| Base Sepolia | `84532`  | https://sepolia.base.org | https://sepolia.basescan.org |
 
-**Always rehearse on Base Sepolia first.** Get test ETH from a Base Sepolia faucet.
+Get test ETH from a Base Sepolia faucet before deploying.
 
----
+## Deploying & Verifying
 
-## Deploying & verifying
-
-You deploy straight from the browser (the app signs a contract-creation tx with your
-wallet). After a deploy, the success dialog shows the exact `arguments.js` and the
-one-line command to verify the source on BaseScan:
+You deploy straight from the browser. The app signs a contract-creation
+transaction with your wallet. After a deploy, the success dialog shows the exact
+`arguments.js` and the one-line command to verify the source on BaseScan:
 
 ```bash
 cd contracts
-export BASESCAN_API_KEY=your_key   # an Etherscan V2 key works for BaseScan
+export BASESCAN_API_KEY=your_key
 # save the arguments.js shown in the app, then:
-npx hardhat verify --network base --constructor-args arguments.js <TOKEN_ADDRESS>
+npx hardhat verify --network baseSepolia --constructor-args arguments.js <TOKEN_ADDRESS>
 ```
 
-You can also deploy from the CLI with your own script if you prefer; the config in
-`hardhat.config.js` already targets `base` and `baseSepolia`.
+`hardhat.config.js` is also scoped to Base Sepolia right now to prevent accidental
+mainnet usage.
 
----
+## ImgBB Uploads
 
-## A note on Base's *native* B20 standard
+Logo uploads go through the Vercel serverless route at `api/upload-logo.js`.
+Keep `IMGBB_API_KEY` server-side in Vercel or your local environment. Do not add
+an ImgBB key as a `VITE_` variable, because Vite exposes those to browser code.
 
-Base's Beryl upgrade introduces a **native** token standard also called B20, built as
-chain-level **precompiles** for regulated stablecoin / RWA issuers. It has compliance
-policies, freeze-and-seize and supply caps - but **no trading tax, max-wallet or
-max-transaction** mechanics, and (as precompiles) nothing to verify on BaseScan.
+## A Note On Base Native B20
 
-This studio deploys a classic, audited-component Solidity ERC-20 instead, so you get
-taxes, anti-whale limits and instant verification **today**. See the in-app **Docs**
-page for the full comparison. When Base's native B20 factory is broadly live, a
-native-token path can be added alongside this one.
+Base's Beryl upgrade introduces a native token standard also called B20, built as
+chain-level precompiles for regulated stablecoin / RWA issuers. Its mainnet
+rollout is currently paused, and it is separate from this app's classic Solidity
+ERC-20 flow.
 
----
+This studio deploys an audited-component Solidity ERC-20 so you can test taxes,
+anti-whale limits and verification on Base Sepolia now. A native-token path can
+be added later when Base mainnet support is live again.
 
 ## Security
 
-- **Non-custodial.** The app never holds your keys, funds, or ownership.
-- Contracts are immutable once deployed - test on Sepolia every time.
+- Non-custodial. The app never holds your keys, funds, or ownership.
+- Contracts are immutable once deployed. Test on Sepolia every time.
 - The 25% tax ceiling is enforced in the contract; the owner cannot exceed it.
-- Owner powers (blacklist, pause, tax) are real centralised controls. Renounce
-  ownership to prove they can never be used.
+- Owner powers (blacklist, pause, tax) are centralised controls. Renounce
+  ownership when you want to prove they can never be used.
 - Not financial or legal advice. Launch responsibly and follow your local rules.
-
----
 
 ## Tech
 
-- **Contract:** Solidity 0.8.26, OpenZeppelin v5 (ERC20, Burnable, Permit, Ownable2Step),
-  custom errors, packed storage, optimizer on.
-- **Frontend:** Vite, React 18, TypeScript, Tailwind CSS, wagmi v2 + viem,
-  TanStack Query, React Router. System-synced light/dark theme.
+- Contract: Solidity 0.8.26, OpenZeppelin v5, custom errors, packed storage,
+  optimizer on.
+- Frontend: Vite, React 18, TypeScript, Tailwind CSS, wagmi v2 + viem,
+  TanStack Query, React Router.

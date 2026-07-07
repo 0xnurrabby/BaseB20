@@ -4,15 +4,8 @@
  * gets stored on-chain as the token's logoURI.
  */
 
-const IMGBB_KEY = import.meta.env.VITE_IMGBB_API_KEY?.trim();
-const ENDPOINT = "https://api.imgbb.com/1/upload";
-
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // imgbb free tier caps at 32MB; we keep logos small.
+export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
-
-export function isUploadConfigured(): boolean {
-  return !!IMGBB_KEY;
-}
 
 /** Read a File as a base64 string (without the data: prefix), which imgbb expects. */
 function fileToBase64(file: File): Promise<string> {
@@ -36,43 +29,47 @@ export interface UploadResult {
 
 /** Validate + upload an image file to imgbb. Throws with a friendly message on failure. */
 export async function uploadImage(file: File): Promise<UploadResult> {
-  if (!IMGBB_KEY) throw new Error("Image upload is not configured.");
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
     throw new Error("Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG.");
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error("Image is too large. Keep it under 5 MB.");
+    throw new Error("Image is too large. Keep it under 3 MB.");
   }
 
   const base64 = await fileToBase64(file);
-  const body = new FormData();
-  body.append("image", base64);
-  body.append("name", file.name.replace(/\.[^.]+$/, "").slice(0, 60) || "token-logo");
-
   let res: Response;
   try {
-    res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(IMGBB_KEY)}`, { method: "POST", body });
+    res = await fetch("/api/upload-logo", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        image: base64,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      }),
+    });
   } catch {
     throw new Error("Upload failed - check your connection and try again.");
   }
 
-  if (!res.ok) {
-    throw new Error(`Upload failed (${res.status}). Try a different image.`);
-  }
-
-  const json = (await res.json()) as {
-    success?: boolean;
-    data?: { url?: string; display_url?: string; delete_url?: string };
-    error?: { message?: string };
+  const json = (await res.json().catch(() => ({}))) as {
+    url?: string;
+    displayUrl?: string;
+    deleteUrl?: string;
+    error?: string;
   };
 
-  if (!json.success || !json.data?.url) {
-    throw new Error(json.error?.message ?? "Upload failed. Try a different image.");
+  if (!res.ok) {
+    throw new Error(json.error ?? `Upload failed (${res.status}). Try a different image.`);
+  }
+  if (!json.url) {
+    throw new Error("Upload failed. Try a different image.");
   }
 
   return {
-    url: json.data.url,
-    displayUrl: json.data.display_url ?? json.data.url,
-    deleteUrl: json.data.delete_url,
+    url: json.url,
+    displayUrl: json.displayUrl ?? json.url,
+    deleteUrl: json.deleteUrl,
   };
 }

@@ -2,8 +2,6 @@
 
 interface ImportMetaEnv {
   readonly VITE_WALLETCONNECT_PROJECT_ID?: string;
-  readonly VITE_DEFAULT_CHAIN?: string;
-  readonly VITE_IMGBB_API_KEY?: string;
 }
 
 interface ImportMeta {
