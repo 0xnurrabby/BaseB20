@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 import { IconCheck, IconCopy, IconLoader, IconX } from "./icons";
 
 export function cn(...parts: Array<string | false | null | undefined>): string {
@@ -332,26 +333,27 @@ export function Modal({
 
   if (!open) return null;
   const width = size === "sm" ? "max-w-sm" : size === "lg" ? "max-w-2xl" : "max-w-lg";
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-3 sm:items-center sm:p-6">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
       <div
         className={cn(
-          "relative w-full rounded-t-2xl sm:rounded-2xl border border-border bg-surface shadow-card animate-scale-in",
+          "relative flex max-h-[calc(100dvh-1.5rem)] w-full flex-col rounded-2xl border border-border bg-surface shadow-card animate-scale-in sm:max-h-[calc(100dvh-3rem)]",
           width
         )}
       >
         {title && (
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
             <h3 className="text-[15px] font-semibold">{title}</h3>
             <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-border/50 hover:text-fg">
               <IconX className="h-4.5 w-4.5" />
             </button>
           </div>
         )}
-        <div className="max-h-[80vh] overflow-y-auto px-5 py-5">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-5 py-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
