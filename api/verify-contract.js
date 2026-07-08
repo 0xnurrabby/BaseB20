@@ -193,8 +193,8 @@ async function submitVerification(address, constructorArgs) {
       compilerversion: verifySource.compilerVersion,
       optimizationUsed: "1",
       runs: "200",
-      constructorArguements: constructorArgs,
-      evmversion: verifySource.standardJsonInput?.settings?.evmVersion || "default",
+      constructorArguments: constructorArgs,
+      evmVersion: verifySource.standardJsonInput?.settings?.evmVersion || "default",
       licenseType: verifySource.licenseType || "3",
     },
     { method: "POST" }
