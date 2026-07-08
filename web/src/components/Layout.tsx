@@ -3,7 +3,7 @@ import { NavLink, Link } from "react-router-dom";
 import { useChainId } from "wagmi";
 import { WalletConnect } from "./WalletConnect";
 import { useTheme } from "./ThemeProvider";
-import { isSupportedChain } from "../lib/wagmi";
+import { isSupportedChain, supportedChainNames } from "../lib/wagmi";
 import { cn } from "./ui";
 import {
   IconBook,
@@ -129,7 +129,7 @@ function NetworkBanner() {
   if (isSupportedChain(chainId)) return null;
   return (
     <div className="border-b border-negative/30 bg-negative/10 px-4 py-2 text-center text-xs text-negative">
-      You're connected to an unsupported network. Switch to <strong>Base Sepolia</strong> to continue.
+      You're connected to an unsupported network. Switch to <strong>{supportedChainNames()}</strong> to continue.
     </div>
   );
 }

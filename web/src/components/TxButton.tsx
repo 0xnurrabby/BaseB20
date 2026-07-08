@@ -1,15 +1,23 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import type { Abi } from "viem";
 import { Button, cn } from "./ui";
 import { IconCheck } from "./icons";
+import { chainName, getTargetChainId, isSupportedChain, supportedChainNames, type SupportedChainId } from "../lib/wagmi";
 
 export interface TxRequest {
+  chainId?: SupportedChainId;
   address: `0x${string}`;
   abi: Abi;
   functionName: string;
   args?: readonly unknown[];
   value?: bigint;
+}
+
+const TxChainContext = createContext<SupportedChainId | undefined>(undefined);
+
+export function TxChainProvider({ chainId, children }: { chainId: SupportedChainId; children: ReactNode }) {
+  return <TxChainContext.Provider value={chainId}>{children}</TxChainContext.Provider>;
 }
 
 /**
@@ -27,6 +35,7 @@ export function TxButton({
   disabled,
   className,
   confirmLabel,
+  chainId,
 }: {
   build: () => TxRequest | null;
   children: ReactNode;
@@ -37,14 +46,21 @@ export function TxButton({
   disabled?: boolean;
   className?: string;
   confirmLabel?: string;
+  chainId?: SupportedChainId;
 }) {
+  const walletChainId = useChainId();
+  const contextChainId = useContext(TxChainContext);
+  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
-  const { isLoading: mining, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const [txChainId, setTxChainId] = useState<SupportedChainId | undefined>(undefined);
+  const [localError, setLocalError] = useState("");
+  const { isLoading: mining, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: txChainId });
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     if (!isSuccess) return;
     setDone(true);
+    setLocalError("");
     onSuccess?.();
     const t = setTimeout(() => {
       setDone(false);
@@ -54,20 +70,39 @@ export function TxButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess]);
 
-  const busy = isPending || mining;
+  const busy = isSwitching || isPending || mining;
 
-  function onClick() {
+  async function onClick() {
     const req = build();
     if (!req) return;
     if (confirmLabel && !window.confirm(confirmLabel)) return;
-    writeContract(req as Parameters<typeof writeContract>[0]);
+    const targetChainId = req.chainId ?? chainId ?? contextChainId ?? getTargetChainId(walletChainId);
+    if (!isSupportedChain(targetChainId)) {
+      setLocalError(`Unsupported network. Switch to ${supportedChainNames()} and try again.`);
+      return;
+    }
+    setLocalError("");
+    try {
+      if (walletChainId !== targetChainId) {
+        await switchChainAsync({ chainId: targetChainId });
+      }
+      setTxChainId(targetChainId);
+      writeContract({ ...req, chainId: targetChainId } as Parameters<typeof writeContract>[0]);
+    } catch (switchError) {
+      const message = switchError instanceof Error ? switchError.message : "Network switch failed.";
+      setLocalError(
+        message.includes("User rejected")
+          ? "Network switch rejected."
+          : `Switch to ${chainName(targetChainId)} and try again.`
+      );
+    }
   }
 
-  const friendlyError = error
+  const friendlyError = localError || (error
     ? error.message.includes("User rejected")
       ? "Rejected in wallet"
       : error.message.split("\n")[0].slice(0, 120)
-    : null;
+    : null);
 
   return (
     <div className={cn(fullWidth && "w-full")}>
@@ -85,7 +120,7 @@ export function TxButton({
             <IconCheck className="h-4 w-4" /> Done
           </>
         ) : busy ? (
-          isPending ? "Confirm…" : "Pending…"
+          isSwitching ? "Switching network..." : isPending ? "Confirm..." : "Pending..."
         ) : (
           children
         )}

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useAccount, useChainId, usePublicClient, useReadContracts, useWriteContract } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
 import { formatUnits, isAddress, parseUnits, zeroAddress } from "viem";
 import { B20_ABI } from "../lib/contract";
-import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
+import { DEFAULT_CHAIN_ID, chainName, explorerUrl, getTargetChainId, isSupportedChain, type SupportedChainId } from "../lib/wagmi";
 import { getSavedTokens, removeToken, saveToken, type SavedToken } from "../lib/storage";
 import { bpsToPct, formatAmount, isAddressLike, shortAddress } from "../lib/format";
 import {
@@ -20,7 +20,7 @@ import {
   Textarea,
   cn,
 } from "../components/ui";
-import { TxButton } from "../components/TxButton";
+import { TxButton, TxChainProvider } from "../components/TxButton";
 import { WalletConnect } from "../components/WalletConnect";
 import {
   IconAlert,
@@ -72,6 +72,7 @@ interface TokenView {
 
 interface Ctx {
   token: TokenView;
+  chainId: SupportedChainId;
   isOwner: boolean;
   refetch: () => void;
 }
@@ -124,12 +125,14 @@ export function Dashboard() {
   const navigate = useNavigate();
   const chainId = useChainId();
   const { address: connected, isConnected } = useAccount();
+  const supported = isSupportedChain(chainId);
+  const targetChainId = getTargetChainId(chainId);
 
   const [manual, setManual] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const selected = routeAddress && isAddressLike(routeAddress) ? (routeAddress as `0x${string}`) : undefined;
 
-  const saved = useMemo(() => getSavedTokens(chainId), [chainId, selected, refreshKey]);
+  const saved = useMemo(() => getSavedTokens(targetChainId), [targetChainId, selected, refreshKey]);
   const savedToken = useMemo(
     () => (selected ? saved.find((t) => t.address.toLowerCase() === selected.toLowerCase()) : undefined),
     [saved, selected]
@@ -158,16 +161,16 @@ export function Dashboard() {
     "logoURI",
   ];
   const contractsBase = selected
-    ? READ_FNS.map((fn) => ({ address: selected, abi: B20_ABI, functionName: fn }))
+    ? READ_FNS.map((fn) => ({ chainId: targetChainId, address: selected, abi: B20_ABI, functionName: fn }))
     : [];
 
   const { data, refetch, isLoading, isError } = useReadContracts({
     allowFailure: true,
     contracts: [
       ...contractsBase,
-      { address: selected ?? zeroAddress, abi: B20_ABI, functionName: "balanceOf", args: [connected ?? zeroAddress] },
+      { chainId: targetChainId, address: selected ?? zeroAddress, abi: B20_ABI, functionName: "balanceOf", args: [connected ?? zeroAddress] },
     ],
-    query: { enabled: !!selected, refetchInterval: 15_000 },
+    query: { enabled: !!selected && supported, refetchInterval: 15_000 },
   });
 
   const token: TokenView | null = useMemo(() => {
@@ -206,7 +209,7 @@ export function Dashboard() {
         address: token.address,
         name: token.name,
         symbol: token.symbol,
-        chainId,
+        chainId: targetChainId,
         createdAt: Date.now(),
       });
     }
@@ -236,7 +239,7 @@ export function Dashboard() {
             </span>
             <h1 className="mt-5 font-display text-5xl leading-[0.98] text-fg sm:text-6xl">Manage your token controls.</h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted">
-              Pick a saved token, or paste any B20 token address on <strong className="text-fg">{chainName(chainId)}</strong>.
+              Pick a saved token, or paste any B20 token address on <strong className="text-fg">{chainName(targetChainId)}</strong>.
             </p>
           </div>
         </header>
@@ -259,7 +262,7 @@ export function Dashboard() {
         </Card>
 
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted">Your tokens on {chainName(chainId)}</h2>
+          <h2 className="text-sm font-semibold text-muted">Your tokens on {chainName(targetChainId)}</h2>
           <Link to="/create" className="inline-flex items-center gap-1.5 text-sm font-medium text-fg hover:opacity-70">
             <IconPlus className="h-4 w-4" /> New token
           </Link>
@@ -280,7 +283,7 @@ export function Dashboard() {
         ) : (
           <div className="space-y-2">
             {saved.map((t) => (
-              <SavedRow key={t.address} t={t} onOpen={() => openToken(t.address)} onRemove={() => { removeToken(t.address, chainId); setRefreshKey((k) => k + 1); }} chainId={chainId} />
+              <SavedRow key={t.address} t={t} onOpen={() => openToken(t.address)} onRemove={() => { removeToken(t.address, targetChainId); setRefreshKey((k) => k + 1); }} chainId={targetChainId} />
             ))}
           </div>
         )}
@@ -289,11 +292,11 @@ export function Dashboard() {
   }
 
   // --------------------------- loading / error --------------------------
-  if (!isSupportedChain(chainId)) {
+  if (!supported) {
     return (
       <Centered>
         <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />} title="Wrong network">
-          Switch to Base Sepolia to manage this token.
+          Switch to {chainName(DEFAULT_CHAIN_ID)} to manage this token.
         </Callout>
       </Centered>
     );
@@ -312,7 +315,7 @@ export function Dashboard() {
       <Centered>
         <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />} title="Couldn't read this token">
           <p>
-            <code className="font-mono text-xs">{selected}</code> doesn't look like a readable token on {chainName(chainId)}.
+            <code className="font-mono text-xs">{selected}</code> doesn't look like a readable token on {chainName(targetChainId)}.
             Double-check the address and network.
           </p>
           <Link to="/dashboard" className="mt-2 inline-block underline">Back to token list</Link>
@@ -321,7 +324,7 @@ export function Dashboard() {
     );
   }
 
-  const ctx: Ctx = { token, isOwner, refetch };
+  const ctx: Ctx = { token, chainId: targetChainId, isOwner, refetch };
   const renounced = token.owner === zeroAddress;
 
   return (
@@ -350,7 +353,7 @@ export function Dashboard() {
               <div className="mt-1 flex items-center gap-2">
                 <code className="font-mono text-xs text-faint">{shortAddress(token.address, 6)}</code>
                 <CopyButton value={token.address} label="" />
-                <a href={`${explorerUrl(chainId)}/token/${token.address}`} target="_blank" rel="noreferrer" className="text-faint hover:text-fg">
+                <a href={`${explorerUrl(targetChainId)}/token/${token.address}`} target="_blank" rel="noreferrer" className="text-faint hover:text-fg">
                   <IconExternal className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -392,20 +395,22 @@ export function Dashboard() {
         </Card>
       )}
 
-      <VerifyPanel token={token} chainId={chainId} savedToken={savedToken} onSaved={() => setRefreshKey((k) => k + 1)} />
+      <VerifyPanel token={token} chainId={targetChainId} savedToken={savedToken} onSaved={() => setRefreshKey((k) => k + 1)} />
 
       {/* Panels */}
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <TaxPanel {...ctx} />
-        <TradingPanel {...ctx} />
-        <SupplyPanel {...ctx} />
-        <LimitsPanel {...ctx} />
-        <PairsPanel {...ctx} />
-        <AccessPanel {...ctx} />
-        <AirdropPanel {...ctx} />
-        <OwnershipPanel {...ctx} isPendingOwner={isPendingOwner} />
-        <RescuePanel {...ctx} />
-      </div>
+      <TxChainProvider chainId={targetChainId}>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <TaxPanel {...ctx} />
+          <TradingPanel {...ctx} />
+          <SupplyPanel {...ctx} />
+          <LimitsPanel {...ctx} />
+          <PairsPanel {...ctx} />
+          <AccessPanel {...ctx} />
+          <AirdropPanel {...ctx} />
+          <OwnershipPanel {...ctx} isPendingOwner={isPendingOwner} />
+          <RescuePanel {...ctx} />
+        </div>
+      </TxChainProvider>
     </div>
   );
 }
@@ -671,7 +676,7 @@ function fallbackVerifyMessage(status: VerifyStatus) {
   return "Verification failed. Try again.";
 }
 
-function TaxPanel({ token, isOwner, refetch }: Ctx) {
+function TaxPanel({ token, chainId, isOwner, refetch }: Ctx) {
   const [buy, setBuy] = useState(bpsToPct(token.buyTaxBps));
   const [sell, setSell] = useState(bpsToPct(token.sellTaxBps));
   const [burn, setBurn] = useState(bpsToPct(token.burnTaxBps));
@@ -681,7 +686,9 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
   const [saveError, setSaveError] = useState("");
   const [saveStep, setSaveStep] = useState("");
   const lastToken = useRef(token.address);
-  const publicClient = usePublicClient();
+  const walletChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+  const publicClient = usePublicClient({ chainId });
   const { writeContractAsync } = useWriteContract();
 
   const buyBps = Math.round(buy * 100);
@@ -723,9 +730,14 @@ function TaxPanel({ token, isOwner, refetch }: Ctx) {
     setDone(false);
     setSaveError("");
     try {
+      if (walletChainId !== chainId) {
+        setSaveStep(`Switch to ${chainName(chainId)}`);
+        await switchChainAsync({ chainId });
+      }
       for (const change of feeChanges) {
         setSaveStep(change.label);
         const hash = await writeContractAsync({
+          chainId,
           address: token.address,
           abi: B20_ABI,
           functionName: change.fn,

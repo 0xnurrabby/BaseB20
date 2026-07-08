@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { formatUnits } from "viem";
 import { useAccount, useBalance, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
-import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
+import { ACTIVE_CHAINS, DEFAULT_CHAIN_ID, chainName, explorerUrl, getTargetChainId, isSupportedChain, supportedChainNames } from "../lib/wagmi";
 import { shortAddress } from "../lib/format";
 import { Badge, Button, CopyButton, Divider, Modal } from "./ui";
 import { IconAlert, IconChevronDown, IconExternal, IconWallet } from "./icons";
@@ -77,7 +76,7 @@ function ConnectModal({ open, onClose }: { open: boolean; onClose: () => void })
             onClick={() => {
               setPendingId(c.uid);
               connect(
-                { connector: c },
+                { connector: c, chainId: DEFAULT_CHAIN_ID },
                 { onSettled: () => setPendingId(null), onSuccess: () => onClose() }
               );
             }}
@@ -97,7 +96,7 @@ function ConnectModal({ open, onClose }: { open: boolean; onClose: () => void })
       </div>
       {error && <p className="mt-3 text-xs text-negative">{error.message}</p>}
       <p className="mt-4 text-center text-[11px] text-faint">
-        By connecting, you agree to interact with public smart contracts on Base Sepolia. B20 never holds your keys.
+        By connecting, you agree to interact with public smart contracts on {supportedChainNames()}. B20 never holds your keys.
       </p>
     </Modal>
   );
@@ -118,7 +117,8 @@ function AccountModal({
 }) {
   const { disconnect } = useDisconnect();
   const { switchChain, isPending } = useSwitchChain();
-  const { data: balance } = useBalance({ address: address as `0x${string}` });
+  const targetChainId = getTargetChainId(chainId);
+  const { data: balance } = useBalance({ address: address as `0x${string}`, chainId: targetChainId });
   const supported = isSupportedChain(chainId);
 
   return (
@@ -130,7 +130,7 @@ function AccountModal({
             <div className="flex items-center gap-1.5">
               <CopyButton value={address} />
               <a
-                href={`${explorerUrl(chainId)}/address/${address}`}
+                href={`${explorerUrl(targetChainId)}/address/${address}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-muted hover:text-fg"
@@ -151,19 +151,22 @@ function AccountModal({
           <p className="mb-2 text-[13px] font-medium">Network</p>
           {!supported && (
             <p className="mb-2 text-xs text-negative">
-              You're on an unsupported network. Switch to Base Sepolia to use B20.
+              You're on an unsupported network. Switch to {supportedChainNames()} to use B20.
             </p>
           )}
-          <div>
-            <Button
-              variant={chainId === baseSepolia.id ? "primary" : "outline"}
-              size="sm"
-              fullWidth
-              loading={isPending}
-              onClick={() => switchChain({ chainId: baseSepolia.id })}
-            >
-              Base Sepolia
-            </Button>
+          <div className="space-y-2">
+            {ACTIVE_CHAINS.map((chain) => (
+              <Button
+                key={chain.id}
+                variant={chainId === chain.id ? "primary" : "outline"}
+                size="sm"
+                fullWidth
+                loading={isPending}
+                onClick={() => switchChain({ chainId: chain.id })}
+              >
+                {chainName(chain.id)}
+              </Button>
+            ))}
           </div>
         </div>
 

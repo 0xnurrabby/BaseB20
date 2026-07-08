@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAccount, useChainId, useDeployContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useChainId, useDeployContract, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { B20_ABI, B20_BYTECODE, buildVerifyArgs, serializeTokenConfig, verifyCommand, verifyReadyCommand, type TokenConfigInput } from "../lib/contract";
-import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
+import { DEFAULT_CHAIN_ID, chainName, explorerUrl, getTargetChainId, isSupportedChain } from "../lib/wagmi";
 import { commafy, isAddressLike, parseWholeNumber } from "../lib/format";
 import { saveToken } from "../lib/storage";
 import { trackEvent } from "../lib/analytics";
@@ -111,9 +111,12 @@ export function Create() {
   };
   const err = (key: string, message?: string) => (touched[key] ? message : undefined);
 
+  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { deployContract, data: hash, isPending, error, reset } = useDeployContract();
-  const { data: receipt, isLoading: isMining } = useWaitForTransactionReceipt({ hash });
+  const targetChainId = getTargetChainId(chainId);
+  const { data: receipt, isLoading: isMining } = useWaitForTransactionReceipt({ hash, chainId: targetChainId });
   const [deployedCfg, setDeployedCfg] = useState<TokenConfigInput | null>(null);
+  const [networkError, setNetworkError] = useState("");
 
   const supported = isSupportedChain(chainId);
 
@@ -183,7 +186,7 @@ export function Create() {
     };
   }
 
-  function onDeploy() {
+  async function onDeploy() {
     if (hasErrors) {
       // Reveal every validation message so the user can see what to fix.
       setTouched(Object.keys(DEFAULTS).reduce((a, k) => ({ ...a, [k]: true }), {}));
@@ -191,8 +194,18 @@ export function Create() {
     }
     const cfg = buildConfig();
     if (!cfg) return;
+    setNetworkError("");
+    try {
+      if (chainId !== targetChainId) {
+        await switchChainAsync({ chainId: targetChainId });
+      }
+    } catch (switchError) {
+      const message = switchError instanceof Error ? switchError.message : "Network switch failed.";
+      setNetworkError(message.includes("User rejected") ? "Network switch rejected." : `Switch to ${chainName(targetChainId)} and try again.`);
+      return;
+    }
     setDeployedCfg(cfg);
-    deployContract({ abi: B20_ABI, bytecode: B20_BYTECODE, args: [cfg as unknown as Record<string, unknown>] });
+    deployContract({ chainId: targetChainId, abi: B20_ABI, bytecode: B20_BYTECODE, args: [cfg as unknown as Record<string, unknown>] });
   }
 
   // Persist to registry once mined.
@@ -204,7 +217,7 @@ export function Create() {
         address: deployedAddress,
         name: deployedCfg.name_,
         symbol: deployedCfg.symbol_,
-        chainId,
+        chainId: targetChainId,
         createdAt: Date.now(),
         deployer: address,
         txHash: hash,
@@ -218,7 +231,7 @@ export function Create() {
           tokenAddress: deployedAddress,
           tokenName: deployedCfg.name_,
           tokenSymbol: deployedCfg.symbol_,
-          chainId,
+          chainId: targetChainId,
           txHash: hash,
           pagePath: "/create",
         });
@@ -444,12 +457,12 @@ export function Create() {
               </Card>
             ) : !supported ? (
               <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />} title="Wrong network">
-                Switch to Base Sepolia from the wallet menu.
+                Switch to {chainName(DEFAULT_CHAIN_ID)} from the wallet menu.
               </Callout>
             ) : (
-              <Button size="lg" fullWidth loading={isPending || isMining} onClick={onDeploy} className="gap-2">
+              <Button size="lg" fullWidth loading={isSwitching || isPending || isMining} onClick={onDeploy} className="gap-2">
                 <IconRocket className="h-5 w-5" />
-                {isPending ? "Confirm in wallet..." : isMining ? "Deploying..." : "Deploy token"}
+                {isSwitching ? "Switching network..." : isPending ? "Confirm in wallet..." : isMining ? "Deploying..." : "Deploy token"}
               </Button>
             )}
             {hasErrors && isConnected && supported && (
@@ -460,6 +473,7 @@ export function Create() {
                 {error.message.includes("User rejected") ? "Transaction rejected." : "Deploy failed. Check console for details."}
               </p>
             )}
+            {networkError && <p className="mt-2 text-center text-xs text-negative">{networkError}</p>}
           </div>
         </div>
       </div>
@@ -469,7 +483,7 @@ export function Create() {
         open={!!deployedAddress}
         onClose={resetAll}
         address={deployedAddress}
-        chainId={chainId}
+        chainId={targetChainId}
         cfg={deployedCfg}
       />
     </div>
