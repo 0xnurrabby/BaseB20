@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccount, useChainId, useDeployContract, useWaitForTransactionReceipt } from "wagmi";
-import { B20_ABI, B20_BYTECODE, buildVerifyArgs, verifyCommand, verifyReadyCommand, type TokenConfigInput } from "../lib/contract";
+import { B20_ABI, B20_BYTECODE, buildVerifyArgs, serializeTokenConfig, verifyCommand, verifyReadyCommand, type TokenConfigInput } from "../lib/contract";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
 import { commafy, isAddressLike } from "../lib/format";
 import { saveToken } from "../lib/storage";
@@ -198,6 +198,7 @@ export function Create() {
         createdAt: Date.now(),
         deployer: address,
         txHash: hash,
+        verifyConfig: serializeTokenConfig(deployedCfg),
       });
       if (trackedDeploy !== deployedAddress) {
         setTrackedDeploy(deployedAddress);
@@ -610,7 +611,7 @@ function SuccessModal({
               <div>
                 <p className="text-sm font-semibold">Verify on BaseScan</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Open the <code className="rounded bg-surface px-1">contracts/</code> folder, copy one command, then run it.
+                  Open the dashboard and press <strong className="text-fg">Verify & publish</strong>. No terminal command needed.
                 </p>
               </div>
               <Badge tone="positive" className="w-fit">
@@ -619,11 +620,11 @@ function SuccessModal({
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <CopyButton
-                value={readyCommand}
-                label="Copy ready command"
-                className="h-10 justify-center rounded-xl bg-surface text-sm font-medium text-fg"
-              />
+              <Link to={`/dashboard/${address}`} onClick={onClose}>
+                <Button fullWidth className="gap-1.5">
+                  <IconCheck className="h-4 w-4" /> Verify & publish
+                </Button>
+              </Link>
               <a href={verifyUrl} target="_blank" rel="noreferrer">
                 <Button variant="outline" fullWidth className="gap-1.5">
                   <IconExternal className="h-4 w-4" /> Open verify page
@@ -632,12 +633,17 @@ function SuccessModal({
             </div>
 
             <p className="mt-3 text-[11px] leading-relaxed text-faint">
-              If Hardhat asks for an API key, set <code className="rounded bg-surface px-1">BASESCAN_API_KEY</code> once and run the copied command again.
+              The dashboard uses the server-side BaseScan key, keeps it private, and checks the result automatically.
             </p>
 
             <details className="mt-3 border-t border-border pt-3">
-              <summary className="cursor-pointer text-xs font-medium text-muted">Manual copy options</summary>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <summary className="cursor-pointer text-xs font-medium text-muted">Manual fallback</summary>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <CopyButton
+                  value={readyCommand}
+                  label="Copy ready command"
+                  className="h-9 justify-center rounded-xl bg-surface"
+                />
                 <CopyButton value={argsFile} label="Copy arguments.js" className="h-9 justify-center rounded-xl bg-surface" />
                 <CopyButton value={hardhatCommand} label="Copy Hardhat command" className="h-9 justify-center rounded-xl bg-surface" />
               </div>

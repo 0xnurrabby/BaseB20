@@ -387,23 +387,18 @@ const SECTIONS: Section[] = [
     id: "verify",
     title: "Verify On BaseScan",
     eyebrow: "Source Publishing",
-    summary: "Use the generated command to publish contract source and constructor arguments.",
+    summary: "Publish contract source from the dashboard with one button.",
     tone: "amber",
     icon: <IconCheck className="h-5 w-5" />,
     body: (
       <>
         <P>
-          After deployment, the success dialog includes a <b>Copy ready command</b> action. Run it from
-          the <Code>contracts/</Code> folder. It writes <Code>arguments.js</Code> and starts Hardhat verification.
+          Open your token in the dashboard and press <b>Verify & publish</b>. The app submits
+          the exact compiler input and constructor arguments to BaseScan, then checks the result for you.
         </P>
-        <Pre>{`cd contracts
-export BASESCAN_API_KEY=your_key
-
-# Paste the copied command from the app.
-npx hardhat verify --network baseSepolia \\
-  --constructor-args arguments.js <TOKEN_ADDRESS>`}</Pre>
         <P>
-          Once verified, BaseScan shows the source code and constructor arguments publicly.
+          The verifier uses a server-side <Code>BASESCAN_API_KEY</Code>, so the key never goes to
+          the browser. Once verified, BaseScan shows the source code publicly.
         </P>
       </>
     ),
@@ -631,12 +626,4 @@ function Ol({ children }: { children: ReactNode }) {
 
 function Code({ children }: { children: ReactNode }) {
   return <code className="rounded-lg border border-border bg-bg px-1.5 py-0.5 font-mono text-[12px] text-fg">{children}</code>;
-}
-
-function Pre({ children }: { children: ReactNode }) {
-  return (
-    <pre className="overflow-auto rounded-xl border border-border bg-bg p-4 font-mono text-[12px] leading-relaxed text-fg">
-      {children}
-    </pre>
-  );
 }

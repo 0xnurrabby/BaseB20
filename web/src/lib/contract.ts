@@ -24,6 +24,42 @@ export interface TokenConfigInput {
   logoURI_: string;
 }
 
+export interface SerializableTokenConfig {
+  name_: string;
+  symbol_: string;
+  decimals_: number;
+  initialSupply: string;
+  cap: string;
+  owner_: `0x${string}`;
+  taxWallet_: `0x${string}`;
+  buyTaxBps_: number;
+  sellTaxBps_: number;
+  burnTaxBps_: number;
+  mintable: boolean;
+  maxTxTokens: string;
+  maxWalletTokens: string;
+  logoURI_: string;
+}
+
+export function serializeTokenConfig(cfg: TokenConfigInput): SerializableTokenConfig {
+  return {
+    name_: cfg.name_,
+    symbol_: cfg.symbol_,
+    decimals_: cfg.decimals_,
+    initialSupply: cfg.initialSupply.toString(),
+    cap: cfg.cap.toString(),
+    owner_: cfg.owner_,
+    taxWallet_: cfg.taxWallet_,
+    buyTaxBps_: cfg.buyTaxBps_,
+    sellTaxBps_: cfg.sellTaxBps_,
+    burnTaxBps_: cfg.burnTaxBps_,
+    mintable: cfg.mintable,
+    maxTxTokens: cfg.maxTxTokens.toString(),
+    maxWalletTokens: cfg.maxWalletTokens.toString(),
+    logoURI_: cfg.logoURI_,
+  };
+}
+
 /**
  * Builds the `arguments.js` file contents for `hardhat verify`, matching the
  * TokenConfig struct exactly. bigints are emitted as quoted decimal strings.

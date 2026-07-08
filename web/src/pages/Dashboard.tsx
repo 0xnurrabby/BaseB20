@@ -81,6 +81,10 @@ const dashboardTone = {
     card: "border-sky-200/80 bg-sky-50/60 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
     icon: "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
   },
+  verify: {
+    card: "border-indigo-200/80 bg-indigo-50/60 dark:border-indigo-400/20 dark:bg-indigo-400/[0.07]",
+    icon: "border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-indigo-400/25 dark:bg-indigo-400/10 dark:text-indigo-200",
+  },
   tax: {
     card: "border-amber-200/80 bg-amber-50/55 dark:border-amber-400/20 dark:bg-amber-400/[0.07]",
     icon: "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
@@ -126,6 +130,10 @@ export function Dashboard() {
   const selected = routeAddress && isAddressLike(routeAddress) ? (routeAddress as `0x${string}`) : undefined;
 
   const saved = useMemo(() => getSavedTokens(chainId), [chainId, selected, refreshKey]);
+  const savedToken = useMemo(
+    () => (selected ? saved.find((t) => t.address.toLowerCase() === selected.toLowerCase()) : undefined),
+    [saved, selected]
+  );
 
   // ---- reads (single multicall) ---------------------------------------
   const READ_FNS = [
@@ -384,6 +392,8 @@ export function Dashboard() {
         </Card>
       )}
 
+      <VerifyPanel token={token} chainId={chainId} savedToken={savedToken} onSaved={() => setRefreshKey((k) => k + 1)} />
+
       {/* Panels */}
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <TaxPanel {...ctx} />
@@ -449,6 +459,217 @@ function SavedRow({ t, onOpen, onRemove, chainId }: { t: SavedToken; onOpen: () 
 }
 
 /* ================================ PANELS ================================= */
+
+type VerifyStatus = "checking" | "ready" | "pending" | "verified" | "failed" | "not_configured";
+
+interface VerifyResponse {
+  status: VerifyStatus;
+  message?: string;
+  error?: string;
+  guid?: string;
+  explorerUrl?: string;
+}
+
+function VerifyPanel({
+  token,
+  chainId,
+  savedToken,
+  onSaved,
+}: {
+  token: TokenView;
+  chainId: number;
+  savedToken?: SavedToken;
+  onSaved: () => void;
+}) {
+  const [status, setStatus] = useState<VerifyStatus>(savedToken?.verifiedAt ? "verified" : "checking");
+  const [message, setMessage] = useState(savedToken?.verifiedAt ? "Verified and published on BaseScan." : "Checking BaseScan...");
+  const [guid, setGuid] = useState(savedToken?.verifyGuid ?? "");
+  const [busy, setBusy] = useState(false);
+  const explorer = `${explorerUrl(chainId)}/address/${token.address}#code`;
+  const pendingTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const nextStatus = savedToken?.verifiedAt ? "verified" : savedToken?.verifyGuid ? "pending" : "checking";
+    setStatus(nextStatus);
+    setMessage(
+      savedToken?.verifiedAt
+        ? "Verified and published on BaseScan."
+        : savedToken?.verifyGuid
+          ? "BaseScan is processing the request."
+          : "Checking BaseScan..."
+    );
+    setGuid(savedToken?.verifyGuid ?? "");
+  }, [savedToken?.verifiedAt, savedToken?.verifyGuid, token.address]);
+
+  useEffect(() => {
+    if (savedToken?.verifiedAt) return;
+    let cancelled = false;
+    verifyRequest({
+      action: savedToken?.verifyGuid && !savedToken?.verifiedAt ? "status" : "lookup",
+      address: token.address,
+      chainId,
+      guid: savedToken?.verifyGuid,
+    }).then((res) => {
+      if (cancelled) return;
+      applyVerifyResult(res, token, chainId, savedToken, setStatus, setMessage, setGuid, onSaved);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token.address, chainId, savedToken?.verifyGuid, savedToken?.verifiedAt]);
+
+  useEffect(() => {
+    window.clearTimeout(pendingTimer.current);
+    if (status !== "pending" || !guid) return;
+    pendingTimer.current = window.setTimeout(async () => {
+      const res = await verifyRequest({ action: "status", address: token.address, chainId, guid });
+      applyVerifyResult(res, token, chainId, savedToken, setStatus, setMessage, setGuid, onSaved);
+    }, 6500);
+    return () => window.clearTimeout(pendingTimer.current);
+  }, [status, guid, token, chainId, savedToken, onSaved]);
+
+  async function startVerify() {
+    setBusy(true);
+    setStatus("pending");
+    setMessage("Submitting to BaseScan...");
+    const res = await verifyRequest({
+      action: "submit",
+      address: token.address,
+      chainId,
+      txHash: savedToken?.txHash,
+      config: savedToken?.verifyConfig,
+    });
+    applyVerifyResult(res, token, chainId, savedToken, setStatus, setMessage, setGuid, onSaved);
+    setBusy(false);
+  }
+
+  const verified = status === "verified";
+  const pending = status === "checking" || status === "pending" || busy;
+  const failed = status === "failed" || status === "not_configured";
+
+  return (
+    <SectionCard
+      icon={verified ? <IconCheck className="h-5 w-5" /> : <IconShield className="h-5 w-5" />}
+      title="BaseScan verify & publish"
+      desc={verified ? "Source code is public and matched." : "Publish source code with one click."}
+      className={dashboardTone.verify.card}
+      iconClassName={verified ? "border-positive/25 bg-positive/10 text-positive" : dashboardTone.verify.icon}
+      action={
+        <Badge tone={verified ? "positive" : status === "pending" ? "warn" : failed ? "negative" : "neutral"}>
+          {verified ? "Published" : status === "pending" ? "Processing" : failed ? "Needs setup" : "Ready"}
+        </Badge>
+      }
+    >
+      <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <p className={cn("text-sm font-medium", failed ? "text-negative" : verified ? "text-positive" : "text-fg")}>
+            {message}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {verified
+              ? "Anyone can inspect the matched contract source on BaseScan."
+              : status === "not_configured"
+                ? "Server API key is missing. Add BASESCAN_API_KEY in Vercel to enable this button."
+                : "No terminal command or manual constructor arguments needed."}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row md:flex-col">
+          <Button
+            onClick={startVerify}
+            loading={pending}
+            disabled={verified || pending || status === "not_configured"}
+            fullWidth
+            className="whitespace-nowrap"
+            variant={failed ? "secondary" : "primary"}
+          >
+            {verified ? <><IconCheck className="h-4 w-4" /> Published</> : "Verify & publish"}
+          </Button>
+          <a href={explorer} target="_blank" rel="noreferrer">
+            <Button variant="outline" fullWidth className="gap-1.5 whitespace-nowrap">
+              <IconExternal className="h-4 w-4" /> BaseScan code
+            </Button>
+          </a>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+async function verifyRequest(payload: Record<string, unknown>): Promise<VerifyResponse> {
+  try {
+    const res = await fetch("/api/verify-contract", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = (await res.json()) as VerifyResponse;
+    return {
+      status: json.status || (res.ok ? "ready" : "failed"),
+      message: json.message,
+      error: json.error,
+      guid: json.guid,
+      explorerUrl: json.explorerUrl,
+    };
+  } catch {
+    return { status: "failed", error: "Could not reach verification service." };
+  }
+}
+
+function applyVerifyResult(
+  res: VerifyResponse,
+  token: TokenView,
+  chainId: number,
+  savedToken: SavedToken | undefined,
+  setStatus: (status: VerifyStatus) => void,
+  setMessage: (message: string) => void,
+  setGuid: (guid: string) => void,
+  onSaved: () => void
+) {
+  const nextStatus = res.status || "failed";
+  setStatus(nextStatus);
+  setMessage(res.message || res.error || fallbackVerifyMessage(nextStatus));
+  if (res.guid) setGuid(res.guid);
+
+  if (nextStatus === "pending" && res.guid) {
+    saveToken({
+      address: token.address,
+      name: token.name,
+      symbol: token.symbol,
+      chainId,
+      createdAt: savedToken?.createdAt ?? Date.now(),
+      deployer: savedToken?.deployer,
+      txHash: savedToken?.txHash,
+      verifyConfig: savedToken?.verifyConfig,
+      verifyGuid: res.guid,
+    });
+    onSaved();
+  }
+
+  if (nextStatus === "verified") {
+    saveToken({
+      address: token.address,
+      name: token.name,
+      symbol: token.symbol,
+      chainId,
+      createdAt: savedToken?.createdAt ?? Date.now(),
+      deployer: savedToken?.deployer,
+      txHash: savedToken?.txHash,
+      verifyConfig: savedToken?.verifyConfig,
+      verifyGuid: res.guid ?? savedToken?.verifyGuid,
+      verifiedAt: Date.now(),
+    });
+    onSaved();
+  }
+}
+
+function fallbackVerifyMessage(status: VerifyStatus) {
+  if (status === "verified") return "Verified and published on BaseScan.";
+  if (status === "pending") return "BaseScan is processing the request.";
+  if (status === "not_configured") return "Verification is not configured yet.";
+  if (status === "ready") return "Ready to publish on BaseScan.";
+  return "Verification failed. Try again.";
+}
 
 function TaxPanel({ token, isOwner, refetch }: Ctx) {
   const [buy, setBuy] = useState(bpsToPct(token.buyTaxBps));

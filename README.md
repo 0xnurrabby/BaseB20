@@ -73,16 +73,13 @@ Get test ETH from a Base Sepolia faucet before deploying.
 ## Deploying & Verifying
 
 You deploy straight from the browser. The app signs a contract-creation
-transaction with your wallet. After a deploy, the success dialog has a
-`Copy ready command` button for BaseScan verification. Run it from `contracts/`;
-it writes `arguments.js` and then runs Hardhat verify.
+transaction with your wallet. Open the deployed token in the dashboard and press
+`Verify & publish`. The server submits the exact compiler input and constructor
+arguments to BaseScan, then checks the result automatically.
 
-```bash
-cd contracts
-export BASESCAN_API_KEY=your_key
-# paste the copied command from the success dialog
-npx hardhat verify --network baseSepolia --constructor-args arguments.js <TOKEN_ADDRESS>
-```
+Set `BASESCAN_API_KEY` in Vercel so the one-click dashboard verifier can call
+the BaseScan / Etherscan V2 API. `BASE_SEPOLIA_RPC_URL` is optional; the app
+defaults to the public Base Sepolia RPC.
 
 `hardhat.config.js` is also scoped to Base Sepolia right now to prevent accidental
 mainnet usage.
