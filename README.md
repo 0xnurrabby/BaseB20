@@ -110,15 +110,20 @@ be added later when Base mainnet support is live again.
 ## Security
 
 - Non-custodial. The app never holds your keys, funds, or ownership.
+- Token creation includes automated preflight checks for supply math, decimals,
+  address format, fee caps, mint risk, owner powers and verification readiness.
 - Contracts are immutable once deployed. Test on Sepolia every time.
 - The 25% tax ceiling is enforced in the contract; the owner cannot exceed it.
+- The contract rejects zero supply, decimals above 18, and supply/cap/limit
+  values that cannot be safely scaled on-chain.
 - Owner powers (blacklist, pause, tax) are centralised controls. Renounce
   ownership when you want to prove they can never be used.
-- Not financial or legal advice. Launch responsibly and follow your local rules.
+- The security profile is an audit-style first pass, not a formal audit or
+  guarantee. Launch responsibly and follow your local rules.
 
 ## Tech
 
-- Contract: Solidity 0.8.26, OpenZeppelin v5, custom errors, packed storage,
+- Contract: Solidity 0.8.35, OpenZeppelin v5, custom errors, packed storage,
   optimizer on.
 - Frontend: Vite, React 18, TypeScript, Tailwind CSS, wagmi v2 + viem,
   TanStack Query, React Router.

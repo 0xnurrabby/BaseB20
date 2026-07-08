@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAccount, useChainId, useDeployContract, useWaitForTransactionReceipt } from "wagmi";
 import { B20_ABI, B20_BYTECODE, buildVerifyArgs, serializeTokenConfig, verifyCommand, verifyReadyCommand, type TokenConfigInput } from "../lib/contract";
 import { chainName, explorerUrl, isSupportedChain } from "../lib/wagmi";
-import { commafy, isAddressLike } from "../lib/format";
+import { commafy, isAddressLike, parseWholeNumber } from "../lib/format";
 import { saveToken } from "../lib/storage";
 import { trackEvent } from "../lib/analytics";
 import {
@@ -29,6 +29,7 @@ import {
   IconGauge,
   IconRocket,
   IconSettings,
+  IconShield,
   IconSparkles,
   IconTrendDown,
   IconTrendUp,
@@ -77,6 +78,8 @@ const DEFAULTS: FormState = {
   maxWallet: "2",
 };
 
+const MAX_UINT256 = (1n << 256n) - 1n;
+
 const createPanel = {
   basics: {
     card: "border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
@@ -115,21 +118,25 @@ export function Create() {
   const supported = isSupportedChain(chainId);
 
   // ---- validation ------------------------------------------------------
-  const supplyNum = Number(f.supply.replace(/,/g, ""));
-  const decimalsNum = Number(f.decimals);
-  const maxSupplyNum = Number(f.maxSupply.replace(/,/g, ""));
+  const decimalsText = f.decimals.trim();
+  const decimalsNum = decimalsText === "" ? NaN : Number(decimalsText);
+  const decimalsOk = Number.isInteger(decimalsNum) && decimalsNum >= 0 && decimalsNum <= 18;
+  const supplyBig = parseWholeNumber(f.supply);
+  const maxSupplyBig = parseWholeNumber(f.maxSupply);
+  const maxWholeSupply = decimalsOk ? MAX_UINT256 / 10n ** BigInt(decimalsNum) : null;
 
   const errors = useMemo(() => {
     const e: Partial<Record<string, string>> = {};
     if (!f.name.trim()) e.name = "Name is required";
     if (!f.symbol.trim()) e.symbol = "Symbol is required";
     else if (f.symbol.trim().length > 11) e.symbol = "Keep the symbol at 11 characters or less";
-    if (!Number.isFinite(supplyNum) || supplyNum <= 0) e.supply = "Enter a supply greater than 0";
-    else if (!Number.isInteger(supplyNum)) e.supply = "Supply must be a whole number";
+    if (supplyBig === null || supplyBig <= 0n) e.supply = "Enter a whole supply greater than 0";
+    else if (maxWholeSupply && supplyBig > maxWholeSupply) e.supply = "Supply is too large for this decimal setting";
     if (!Number.isInteger(decimalsNum) || decimalsNum < 0 || decimalsNum > 18) e.decimals = "0-18";
     if (f.capped) {
-      if (!Number.isFinite(maxSupplyNum) || maxSupplyNum <= 0) e.maxSupply = "Enter a max supply";
-      else if (maxSupplyNum < supplyNum) e.maxSupply = "Max supply must be at least initial supply";
+      if (maxSupplyBig === null || maxSupplyBig <= 0n) e.maxSupply = "Enter a whole max supply";
+      else if (supplyBig !== null && maxSupplyBig < supplyBig) e.maxSupply = "Max supply must be at least initial supply";
+      else if (maxWholeSupply && maxSupplyBig > maxWholeSupply) e.maxSupply = "Max supply is too large for this decimal setting";
     }
     if (f.taxEnabled) {
       if (f.buyTax + f.burnTax > 25) e.buyTax = "Buy + burn tax must be at most 25%";
@@ -138,22 +145,25 @@ export function Create() {
     }
     if (f.logoURI && !/^(https?|ipfs):\/\//.test(f.logoURI)) e.logoURI = "Use an https:// or ipfs:// URL";
     return e;
-  }, [f, supplyNum, decimalsNum, maxSupplyNum]);
+  }, [f, supplyBig, decimalsNum, maxSupplyBig, maxWholeSupply]);
 
   const hasErrors = Object.keys(errors).length > 0;
 
   // ---- build config ----------------------------------------------------
   function buildConfig(): TokenConfigInput | null {
     if (!address) return null;
-    const supply = BigInt(Math.trunc(supplyNum));
-    const cap = f.capped ? BigInt(Math.trunc(maxSupplyNum)) : 0n;
+    if (!supplyBig || supplyBig <= 0n) return null;
+    const supply = supplyBig;
+    const cap = f.capped && maxSupplyBig ? maxSupplyBig : 0n;
+    const maxTxBps = Math.max(0, Math.round(Number(f.maxTx) * 100));
+    const maxWalletBps = Math.max(0, Math.round(Number(f.maxWallet) * 100));
     const maxTxTokens =
-      f.limitsEnabled && Number(f.maxTx) > 0
-        ? BigInt(Math.max(1, Math.floor((supplyNum * Number(f.maxTx)) / 100)))
+      f.limitsEnabled && maxTxBps > 0
+        ? maxBigInt(1n, (supply * BigInt(maxTxBps)) / 10_000n)
         : 0n;
     const maxWalletTokens =
-      f.limitsEnabled && Number(f.maxWallet) > 0
-        ? BigInt(Math.max(1, Math.floor((supplyNum * Number(f.maxWallet)) / 100)))
+      f.limitsEnabled && maxWalletBps > 0
+        ? maxBigInt(1n, (supply * BigInt(maxWalletBps)) / 10_000n)
         : 0n;
     return {
       name_: f.name.trim(),
@@ -294,7 +304,7 @@ export function Create() {
                     className="font-mono uppercase"
                   />
                 </Field>
-                <Field label="Total supply" error={err("supply", errors.supply)} hint={supplyNum > 0 ? `${commafy(supplyNum)} tokens` : "Whole tokens"}>
+                <Field label="Total supply" error={err("supply", errors.supply)} hint={supplyBig && supplyBig > 0n ? `${commafy(supplyBig)} tokens` : "Whole tokens"}>
                   <Input
                     inputMode="numeric"
                     value={f.supply}
@@ -371,7 +381,7 @@ export function Create() {
                       <Switch checked={f.capped} onChange={(v) => set("capped", v)} label="Cap supply" />
                     </div>
                     {f.capped && (
-                      <Field label="Max supply" error={err("maxSupply", errors.maxSupply)} hint={maxSupplyNum > 0 ? `${commafy(maxSupplyNum)} tokens` : "Whole tokens, at least initial supply"}>
+                      <Field label="Max supply" error={err("maxSupply", errors.maxSupply)} hint={maxSupplyBig && maxSupplyBig > 0n ? `${commafy(maxSupplyBig)} tokens` : "Whole tokens, at least initial supply"}>
                         <Input
                           inputMode="numeric"
                           value={f.maxSupply}
@@ -400,10 +410,10 @@ export function Create() {
               >
                 {f.limitsEnabled ? (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Max transaction" hint={`${f.maxTx}% of supply${supplyNum > 0 ? ` | ${commafy(Math.floor((supplyNum * Number(f.maxTx)) / 100))}` : ""}`}>
+                    <Field label="Max transaction" hint={`${f.maxTx}% of supply${supplyBig ? ` | ${commafy(percentOfSupply(supplyBig, f.maxTx))}` : ""}`}>
                       <Slider value={Number(f.maxTx)} min={0.1} max={10} step={0.1} onChange={(v) => set("maxTx", String(v))} />
                     </Field>
-                    <Field label="Max wallet" hint={`${f.maxWallet}% of supply${supplyNum > 0 ? ` | ${commafy(Math.floor((supplyNum * Number(f.maxWallet)) / 100))}` : ""}`}>
+                    <Field label="Max wallet" hint={`${f.maxWallet}% of supply${supplyBig ? ` | ${commafy(percentOfSupply(supplyBig, f.maxWallet))}` : ""}`}>
                       <Slider value={Number(f.maxWallet)} min={0.1} max={10} step={0.1} onChange={(v) => set("maxWallet", String(v))} />
                     </Field>
                   </div>
@@ -422,7 +432,8 @@ export function Create() {
 
         {/* ----------------------------- PREVIEW ----------------------------- */}
         <div className="lg:sticky lg:top-24 lg:h-fit">
-          <PreviewCard f={f} supplyNum={supplyNum} />
+          <PreviewCard f={f} supply={supplyBig} />
+          <SecurityReportCard f={f} supply={supplyBig} decimalsOk={decimalsOk} hasErrors={hasErrors} />
           <div className="mt-4">
             {!isConnected ? (
               <Card className="border-violet-200/80 bg-violet-50/60 p-4 text-center dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
@@ -498,7 +509,107 @@ function TaxSlider({
   );
 }
 
-function PreviewCard({ f, supplyNum }: { f: FormState; supplyNum: number }) {
+function maxBigInt(a: bigint, b: bigint) {
+  return a > b ? a : b;
+}
+
+function percentOfSupply(supply: bigint, pct: string) {
+  const bps = Math.max(0, Math.round(Number(pct) * 100));
+  if (!Number.isFinite(bps) || bps <= 0) return 0n;
+  return (supply * BigInt(bps)) / 10_000n;
+}
+
+function SecurityReportCard({
+  f,
+  supply,
+  decimalsOk,
+  hasErrors,
+}: {
+  f: FormState;
+  supply: bigint | null;
+  decimalsOk: boolean;
+  hasErrors: boolean;
+}) {
+  const checks = securityChecks(f, supply, decimalsOk, hasErrors);
+  const review = checks.filter((c) => c.tone === "warn").length;
+  const fail = checks.filter((c) => c.tone === "negative").length;
+  const score = Math.max(0, 100 - review * 8 - fail * 18);
+  const label = fail ? "Fix required" : review ? "Review" : "Strong";
+  const severity = [
+    { label: "Critical", value: fail, tone: fail ? "negative" : "positive" },
+    { label: "Review", value: review, tone: review ? "warn" : "positive" },
+    { label: "Passed", value: checks.length - review - fail, tone: "positive" },
+  ] as const;
+
+  return (
+    <Card className="mt-4 overflow-hidden border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
+      <div className="flex items-start justify-between gap-3 border-b border-emerald-200/70 bg-surface/80 px-5 py-4 dark:border-emerald-400/20 dark:bg-surface/70">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <IconShield className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Audit-style security report</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Automated preflight checks for this token setup.</p>
+          </div>
+        </div>
+        <Badge tone={fail ? "negative" : review ? "warn" : "positive"}>{score}/100 {label}</Badge>
+      </div>
+      <div className="grid grid-cols-3 gap-2 px-5 pt-4">
+        {severity.map((item) => (
+          <div key={item.label} className="rounded-xl border border-border/70 bg-surface/75 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase text-faint">{item.label}</p>
+            <p className={cn("mt-1 text-lg font-semibold", item.tone === "negative" ? "text-negative" : item.tone === "warn" ? "text-amber-600 dark:text-amber-400" : "text-positive")}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2 px-5 py-4">
+        {checks.map((check) => (
+          <div key={check.label} className="flex items-start gap-2 rounded-xl border border-border/70 bg-surface/75 px-3 py-2.5">
+            <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full", check.tone === "positive" ? "bg-positive/10 text-positive" : check.tone === "warn" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-negative/10 text-negative")}>
+              {check.tone === "positive" ? <IconCheck className="h-3.5 w-3.5" /> : <IconAlert className="h-3.5 w-3.5" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-fg">{check.label}</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{check.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-emerald-200/70 px-5 py-3 text-[11px] leading-relaxed text-faint dark:border-emerald-400/20">
+        Not a formal audit. It helps you launch with safer defaults before public review.
+      </div>
+    </Card>
+  );
+}
+
+function securityChecks(f: FormState, supply: bigint | null, decimalsOk: boolean, hasErrors: boolean) {
+  const buyBurn = f.buyTax + f.burnTax;
+  const sellBurn = f.sellTax + f.burnTax;
+  return [
+    hasErrors || !supply || !decimalsOk
+      ? { tone: "negative" as const, label: "Input validation", text: "Fix highlighted fields before deploy." }
+      : { tone: "positive" as const, label: "Input validation", text: "Supply, decimals and addresses pass local checks." },
+    { tone: "positive" as const, label: "Compiler profile", text: "Solidity 0.8.35, optimizer 200 runs, Cancun EVM, deterministic metadata." },
+    f.mintable
+      ? f.capped
+        ? { tone: "warn" as const, label: "Mint authority", text: "Minting is enabled but capped. Disable minting after launch for stronger trust." }
+        : { tone: "negative" as const, label: "Mint authority", text: "Uncapped minting is a high centralization risk in most audit reports." }
+      : { tone: "positive" as const, label: "Supply control", text: "Fixed supply by default. No new tokens can be minted." },
+    f.taxEnabled
+      ? buyBurn > 15 || sellBurn > 15
+        ? { tone: "warn" as const, label: "Tax limits", text: "Taxes are within the 25% hard cap but may be flagged as high by reviewers." }
+        : { tone: "positive" as const, label: "Tax limits", text: "Taxes are enabled and remain inside the contract hard cap." }
+      : { tone: "positive" as const, label: "Transfer fees", text: "No buy or sell tax in the default configuration." },
+    f.limitsEnabled
+      ? { tone: "warn" as const, label: "Transfer limits", text: "Anti-whale limits are transparent, but reviewers may flag owner-controlled limits." }
+      : { tone: "positive" as const, label: "Transfer limits", text: "No holding or transfer limits by default." },
+    { tone: "warn" as const, label: "Owner powers", text: "Dashboard controls remain owner-only until you renounce ownership." },
+    { tone: "positive" as const, label: "Verification", text: "Dashboard supports one-click BaseScan source verification after deploy." },
+  ];
+}
+
+function PreviewCard({ f, supply }: { f: FormState; supply: bigint | null }) {
   const symbol = f.symbol.trim().toUpperCase() || "TKN";
   const flags: Array<{ label: string; on: boolean }> = [
     { label: "Taxed", on: f.taxEnabled && (f.buyTax > 0 || f.sellTax > 0) },
@@ -525,7 +636,7 @@ function PreviewCard({ f, supplyNum }: { f: FormState; supplyNum: number }) {
         </div>
       </div>
       <div className="space-y-2.5 px-5 py-4 text-sm">
-        <Row label="Supply" value={supplyNum > 0 ? commafy(supplyNum) : "-"} />
+        <Row label="Supply" value={supply && supply > 0n ? commafy(supply) : "-"} />
         <Row label="Decimals" value={f.decimals || "18"} />
         {f.taxEnabled && <Row label="Buy / Sell tax" value={`${f.buyTax}% / ${f.sellTax}%`} />}
         {f.taxEnabled && f.burnTax > 0 && <Row label="Burn / transfer" value={`${f.burnTax}%`} />}

@@ -17,7 +17,7 @@ const BASESCAN_API_KEY = process.env.BASESCAN_API_KEY || "";
 /** @type {import('hardhat/config').HardhatUserConfig} */
 module.exports = {
   solidity: {
-    version: "0.8.26",
+    version: "0.8.35",
     settings: {
       optimizer: { enabled: true, runs: 200 },
       evmVersion: "cancun",

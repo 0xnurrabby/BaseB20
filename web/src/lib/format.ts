@@ -43,10 +43,24 @@ export function formatFull(value: bigint | undefined, decimals: number): string 
 }
 
 /** Compact a plain number string with thousands separators. */
-export function commafy(value: string | number): string {
+export function commafy(value: string | number | bigint): string {
+  if (typeof value === "bigint") return value.toLocaleString();
+  if (typeof value === "string" && /^\d+$/.test(value.replace(/,/g, ""))) {
+    return BigInt(value.replace(/,/g, "")).toLocaleString();
+  }
   const n = typeof value === "string" ? Number(value.replace(/,/g, "")) : value;
   if (!Number.isFinite(n)) return String(value);
   return n.toLocaleString();
+}
+
+export function parseWholeNumber(value: string): bigint | null {
+  const clean = value.replace(/,/g, "").trim();
+  if (!/^\d+$/.test(clean)) return null;
+  try {
+    return BigInt(clean);
+  } catch {
+    return null;
+  }
 }
 
 export function isAddressLike(value: string): boolean {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.35;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -40,6 +40,8 @@ contract B20Token is ERC20, ERC20Burnable, ERC20Permit, Ownable2Step {
     uint16 public constant BPS_DENOMINATOR = 10_000;
     /// @notice Absolute ceiling for the combined tax on any single transfer (25%).
     uint16 public constant MAX_TOTAL_TAX_BPS = 2_500;
+    /// @notice UI-supported decimal range. Keeps supply scaling predictable.
+    uint8 public constant MAX_DECIMALS = 18;
 
     // --------------------------------------------------------------------- //
     //                              Immutables                               //
@@ -101,6 +103,8 @@ contract B20Token is ERC20, ERC20Burnable, ERC20Permit, Ownable2Step {
 
     error TaxTooHigh();
     error ZeroAddress();
+    error InvalidDecimals();
+    error InvalidSupply();
     error MintingDisabled();
     error CapExceeded();
     error AccountBlacklisted();
@@ -186,9 +190,15 @@ contract B20Token is ERC20, ERC20Burnable, ERC20Permit, Ownable2Step {
         if (c.owner_ == address(0)) revert ZeroAddress();
 
         uint8 dec = c.decimals_;
+        if (dec > MAX_DECIMALS) revert InvalidDecimals();
         _decimals = dec;
 
         uint256 unit = 10 ** dec;
+        if (c.initialSupply == 0 || c.initialSupply > type(uint256).max / unit) revert InvalidSupply();
+        if (c.cap != 0 && c.cap > type(uint256).max / unit) revert CapExceeded();
+        if (c.maxTxTokens != 0 && c.maxTxTokens > type(uint256).max / unit) revert MaxTxExceeded();
+        if (c.maxWalletTokens != 0 && c.maxWalletTokens > type(uint256).max / unit) revert MaxWalletExceeded();
+
         uint256 supply = c.initialSupply * unit;
         uint256 cap = c.cap == 0 ? 0 : c.cap * unit;
         if (cap != 0 && supply > cap) revert CapExceeded();
