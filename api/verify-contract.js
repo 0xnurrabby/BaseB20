@@ -1,4 +1,4 @@
-const { encodeAbiParameters, isAddress } = require("viem");
+const { encodeAbiParameters, getAddress, isAddress } = require("viem");
 const { readJson, safeString, send } = require("./_http");
 const verifySource = require("./_verify-source.json");
 
@@ -107,7 +107,12 @@ function getApiKey() {
 
 function normalizeAddress(value) {
   const address = safeString(value, 80);
-  return address && isAddress(address) ? address : null;
+  if (!address || !isAddress(address, { strict: false })) return null;
+  try {
+    return getAddress(address);
+  } catch {
+    return address.toLowerCase();
+  }
 }
 
 function cleanConstructorArgs(value) {
@@ -138,21 +143,22 @@ async function etherscan(params, options = {}) {
     throw new PublicError(501, "not_configured", "BASESCAN_API_KEY is not configured on the server.");
   }
 
-  const form = new URLSearchParams({
+  const auth = new URLSearchParams({
     chainid: String(BASE_SEPOLIA_CHAIN_ID),
     apikey: apiKey,
-    ...params,
   });
+  const form = new URLSearchParams(params);
+  const url = `${ETHERSCAN_V2_API}?${auth.toString()}`;
 
   const method = options.method || "GET";
   const response =
     method === "POST"
-      ? await fetch(ETHERSCAN_V2_API, {
+      ? await fetch(url, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
           body: form,
         })
-      : await fetch(`${ETHERSCAN_V2_API}?${form.toString()}`);
+      : await fetch(`${url}&${form.toString()}`);
 
   let json;
   try {
