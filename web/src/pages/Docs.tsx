@@ -205,10 +205,11 @@ const SECTIONS: Section[] = [
         <Ol>
           <li><b>Mint and batch mint.</b> Requires MINT_ROLE and cannot exceed the configured supply cap.</li>
           <li><b>Supply cap.</b> Requires DEFAULT_ADMIN_ROLE. It can move up or down, but not below totalSupply.</li>
+          <li><b>Burn.</b> Requires BURN_ROLE, removes tokens from the connected wallet, and lowers totalSupply permanently.</li>
           <li><b>Pause features.</b> Transfers, minting and burning are independently pausable.</li>
           <li><b>Metadata.</b> Update name, symbol, contractURI and Asset extraMetadata such as logoURI.</li>
           <li><b>Roles.</b> Grant, revoke and renounce built-in roles from the dashboard.</li>
-          <li><b>Memo transfer.</b> Send normal token transfers with a bytes32 memo.</li>
+          <li><b>Memo transfer.</b> Send normal token transfers with an optional bytes32 memo.</li>
           <li><b>Add to wallet.</b> Import the token into supported wallets with address, symbol, decimals and logo image.</li>
           <li><b>BaseScan publish.</b> Open token, factory and share links from the dashboard without classic source verification.</li>
         </Ol>

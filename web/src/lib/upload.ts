@@ -5,7 +5,7 @@
  */
 
 export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
-export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
+export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 /** Read a File as a base64 string (without the data: prefix), which imgbb expects. */
 function fileToBase64(file: File): Promise<string> {
@@ -30,7 +30,7 @@ export interface UploadResult {
 /** Validate + upload an image file to imgbb. Throws with a friendly message on failure. */
 export async function uploadImage(file: File): Promise<UploadResult> {
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-    throw new Error("Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG.");
+    throw new Error("Unsupported file type. Use PNG, JPG, GIF or WEBP.");
   }
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error("Image is too large. Keep it under 3 MB.");

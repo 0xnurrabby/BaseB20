@@ -144,6 +144,7 @@ export interface B20CreateConfig {
   contractURI: string;
   logoURI: string;
   grantMinter: boolean;
+  grantBurner: boolean;
   grantPauser: boolean;
   grantMetadata: boolean;
   grantOperator: boolean;
@@ -181,6 +182,7 @@ export function buildB20InitCalls(config: B20CreateConfig): `0x${string}`[] {
 
   const grants: Array<readonly [`0x${string}`, boolean]> = [
     [B20_ROLES.MINT_ROLE, config.grantMinter || needsBootstrapMint],
+    [B20_ROLES.BURN_ROLE, config.grantBurner],
     [B20_ROLES.PAUSE_ROLE, config.grantPauser],
     [B20_ROLES.UNPAUSE_ROLE, config.grantPauser],
     [B20_ROLES.METADATA_ROLE, config.grantMetadata],

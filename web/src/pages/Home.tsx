@@ -5,6 +5,7 @@ import {
   IconBook,
   IconCheck,
   IconCoins,
+  IconFlame,
   IconGauge,
   IconLock,
   IconPause,
@@ -14,23 +15,22 @@ import {
   IconSparkles,
   IconUsers,
 } from "../components/icons";
-import { B20_FACTORY_ADDRESS } from "../lib/contract";
 
 const FEATURES = [
-  { icon: IconRocket, title: "Native factory launch", desc: "Create an Asset variant through the Base B20 Factory precompile on Base mainnet." },
-  { icon: IconCheck, title: "ERC-20 compatible", desc: "B20 is an ERC-20 superset, so balances, transfers, approvals and events work with ERC-20 tooling." },
-  { icon: IconShield, title: "Role-based control", desc: "Use DEFAULT_ADMIN_ROLE, MINT_ROLE, PAUSE_ROLE, METADATA_ROLE and OPERATOR_ROLE cleanly." },
-  { icon: IconCoins, title: "Supply cap", desc: "Minting respects the native B20 supply cap, with uint128 max used as the no-cap sentinel." },
-  { icon: IconPause, title: "Granular pause", desc: "Pause transfers, minting or burning independently through native B20 pause controls." },
-  { icon: IconSend, title: "Memo transfers", desc: "Attach bytes32 memos to transfers for invoices, orders and off-chain reconciliation." },
-  { icon: IconUsers, title: "Batch mint", desc: "Asset tokens support batched issuance for clean distributions from the dashboard." },
-  { icon: IconLock, title: "Admin-less option", desc: "When setup is complete, the final admin can be renounced with the native B20 path." },
+  { icon: IconRocket, title: "Launch", desc: "Create a native B20 token on Base in one clean flow." },
+  { icon: IconCoins, title: "Mint", desc: "Send supply to one wallet or many wallets from the dashboard." },
+  { icon: IconFlame, title: "Burn", desc: "Permanently remove tokens from your own balance when needed." },
+  { icon: IconShield, title: "Cap supply", desc: "Keep supply fixed, or leave controlled minting open." },
+  { icon: IconPause, title: "Pause", desc: "Pause transfers, minting or burning during emergencies." },
+  { icon: IconSend, title: "Transfer", desc: "Send normal transfers or add a short memo." },
+  { icon: IconUsers, title: "Roles", desc: "Give trusted wallets only the exact powers they need." },
+  { icon: IconLock, title: "Finalize", desc: "Remove admin powers when the token should be locked." },
 ];
 
 const STEPS = [
-  { n: "01", icon: IconCoins, t: "Configure", d: "Choose name, symbol, decimals, initial supply, cap, logo and bootstrap roles." },
-  { n: "02", icon: IconRocket, t: "Create", d: "Sign one factory transaction on Base mainnet. The token is created by the B20 precompile." },
-  { n: "03", icon: IconGauge, t: "Manage", d: "Use the dashboard for minting, roles, pause, metadata, memo transfers and BaseScan links." },
+  { n: "01", icon: IconCoins, t: "Design", d: "Name, symbol, supply and logo." },
+  { n: "02", icon: IconRocket, t: "Launch", d: "Connect wallet and confirm once on Base." },
+  { n: "03", icon: IconGauge, t: "Manage", d: "Mint, burn, pause, roles, metadata and sharing." },
 ];
 
 export function Home() {
@@ -39,7 +39,7 @@ export function Home() {
       <section className="relative overflow-hidden border-b border-border bg-surface/40">
         <div className="pointer-events-none absolute inset-0 grid-dots opacity-70" />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <div className="grid gap-10 lg:grid-cols-[1fr_390px] lg:items-center">
+          <div className="grid gap-10 lg:grid-cols-[1fr_420px] lg:items-center">
             <div>
               <Badge tone="accent" className="mb-6">
                 <IconSparkles className="h-3.5 w-3.5" /> Base mainnet native B20
@@ -48,7 +48,7 @@ export function Home() {
                 Launch a native B20 token on Base.
               </h1>
               <p className="mt-6 max-w-2xl text-[15px] leading-7 text-muted sm:text-lg">
-                Create a Base-native Asset token with the official B20 Factory precompile. No custom Solidity token bytecode and no legacy custom-token flow.
+                Create your token, upload a logo, set supply, then manage mint, burn, roles and sharing from one clean dashboard.
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Link to="/create">
@@ -63,7 +63,7 @@ export function Home() {
                 </Link>
               </div>
               <div className="mt-7 flex flex-wrap gap-2">
-                {["Chain 8453", "Factory 0xB20f...", "Asset decimals 6-18", "ERC-20 compatible"].map((item) => (
+                {["Base mainnet", "Logo upload", "Mint and burn", "ERC-20 compatible"].map((item) => (
                   <span key={item} className="rounded-full border border-border bg-bg/80 px-3 py-1.5 text-xs font-medium text-muted">
                     {item}
                   </span>
@@ -71,24 +71,7 @@ export function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/65 p-5 shadow-card dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">Launch preview</p>
-                  <p className="mt-1 text-xs text-muted">Native B20 Asset on Base mainnet</p>
-                </div>
-                <Badge tone="positive"><IconCheck className="h-3 w-3" /> Ready</Badge>
-              </div>
-              <div className="space-y-3">
-                <PreviewRow label="Factory" value={`${B20_FACTORY_ADDRESS.slice(0, 8)}...${B20_FACTORY_ADDRESS.slice(-4)}`} />
-                <PreviewRow label="Variant" value="Asset" />
-                <PreviewRow label="Initial admin" value="Connected wallet" />
-                <PreviewRow label="Bootstrap" value="cap, roles, metadata, mint" />
-              </div>
-              <div className="mt-5 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm leading-relaxed text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/[0.08] dark:text-emerald-100">
-                Initial supply can be minted during the factory creation call, so users do not need a second setup transaction.
-              </div>
-            </div>
+            <HeroMotionCard />
           </div>
         </div>
       </section>
@@ -96,9 +79,9 @@ export function Home() {
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-18">
         <div className="mb-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Built around the actual B20 standard</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Everything a token owner needs</h2>
             <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted">
-              The app now targets Base mainnet only and uses the official native B20 surfaces that Base documents.
+              Simple controls on top, detailed docs only when users want the deeper explanation.
             </p>
           </div>
           <Link to="/docs" className="inline-flex items-center gap-1.5 text-sm font-medium text-fg hover:opacity-70">
@@ -107,8 +90,8 @@ export function Home() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <Card key={title} className="p-5 transition hover:border-ring">
-              <span className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-elevated">
+            <Card key={title} className="group p-5 transition duration-300 hover:-translate-y-1 hover:border-ring hover:shadow-card">
+              <span className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-elevated transition duration-300 group-hover:scale-110 group-hover:border-emerald-300">
                 <Icon className="h-5 w-5" />
               </span>
               <h3 className="mt-4 text-[15px] font-semibold">{title}</h3>
@@ -140,18 +123,18 @@ export function Home() {
 
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
         <div className="grid gap-4 md:grid-cols-2">
-          <Card className="border-emerald-200/80 bg-emerald-50/55 p-6 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
+          <Card className="border-emerald-200/80 bg-emerald-50/55 p-6 transition duration-300 hover:-translate-y-1 hover:shadow-card dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
             <IconShield className="h-6 w-6 text-positive" />
-            <h3 className="mt-4 text-lg font-semibold">Correct mainnet path</h3>
+            <h3 className="mt-4 text-lg font-semibold">Base mainnet ready</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              The app is pinned to Base mainnet chain ID 8453 and links to basescan.org. Legacy custom deployment paths have been removed.
+              The app stays on Base mainnet and opens the correct BaseScan token page after launch.
             </p>
           </Card>
-          <Card className="border-violet-200/80 bg-violet-50/55 p-6 dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
+          <Card className="border-violet-200/80 bg-violet-50/55 p-6 transition duration-300 hover:-translate-y-1 hover:shadow-card dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
             <IconBook className="h-6 w-6 text-fg" />
-            <h3 className="mt-4 text-lg font-semibold">Source-aware docs</h3>
+            <h3 className="mt-4 text-lg font-semibold">Plain-language docs</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Documentation now describes B20 as Base's native ERC-20 superset precompile standard, with Factory, roles, policies, pause, permit, and Asset features explained correctly.
+              Docs explain what each control does, when to use it and what to avoid before sharing a token publicly.
             </p>
           </Card>
         </div>
@@ -160,11 +143,40 @@ export function Home() {
   );
 }
 
-function PreviewRow({ label, value }: { label: string; value: string }) {
+function HeroMotionCard() {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface/80 px-4 py-3 text-sm">
-      <span className="text-muted">{label}</span>
-      <span className="truncate font-medium text-fg">{value}</span>
+    <div className="relative mx-auto aspect-square w-full max-w-[420px] overflow-hidden rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6 shadow-card dark:border-sky-400/20 dark:from-sky-400/[0.08] dark:via-surface dark:to-emerald-400/[0.08]">
+      <div className="absolute inset-0 grid-dots opacity-60" />
+      <div className="home-orbit home-orbit-one" />
+      <div className="home-orbit home-orbit-two" />
+      <div className="home-token-core">
+        <span>B20</span>
+      </div>
+      <div className="home-floating-card left-5 top-8">
+        <IconRocket className="h-4 w-4 text-sky-600" />
+        <span>Launch</span>
+      </div>
+      <div className="home-floating-card right-5 top-24 animation-delay-700">
+        <IconCoins className="h-4 w-4 text-emerald-600" />
+        <span>Mint</span>
+      </div>
+      <div className="home-floating-card bottom-24 left-6 animation-delay-1000">
+        <IconFlame className="h-4 w-4 text-rose-600" />
+        <span>Burn</span>
+      </div>
+      <div className="home-floating-card bottom-8 right-6 animation-delay-300">
+        <IconShield className="h-4 w-4 text-violet-600" />
+        <span>Secure</span>
+      </div>
+      <div className="absolute bottom-6 left-6 right-6 rounded-xl border border-border bg-surface/80 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold">Base-ready token</span>
+          <Badge tone="positive"><IconCheck className="h-3 w-3" /> Live</Badge>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-border/70">
+          <div className="home-progress h-full rounded-full bg-gradient-to-r from-sky-400 via-emerald-400 to-violet-400" />
+        </div>
+      </div>
     </div>
   );
 }

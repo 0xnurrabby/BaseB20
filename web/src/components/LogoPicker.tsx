@@ -37,7 +37,7 @@ export function LogoPicker({
     setStatus("idle");
 
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setUploadError("Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG.");
+      setUploadError("Unsupported file type. Use PNG, JPG, GIF or WEBP.");
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
@@ -64,7 +64,7 @@ export function LogoPicker({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       setSelectedFile(null);
-      onChange(res.url);
+      onChange(res.displayUrl || res.url);
       setStatus("done");
       setTimeout(() => setStatus("idle"), 1600);
     } catch (e) {

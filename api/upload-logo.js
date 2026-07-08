@@ -1,6 +1,6 @@
 const ENDPOINT = "https://api.imgbb.com/1/upload";
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"]);
+const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 function send(res, status, body) {
   res.statusCode = status;
@@ -64,7 +64,7 @@ module.exports = async function handler(req, res) {
     return send(res, 400, { error: "Image is too large. Keep it under 3 MB." });
   }
   if (!ACCEPTED_IMAGE_TYPES.has(type)) {
-    return send(res, 400, { error: "Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG." });
+    return send(res, 400, { error: "Unsupported file type. Use PNG, JPG, GIF or WEBP." });
   }
   if (!Number.isFinite(size) || size <= 0 || size > MAX_IMAGE_BYTES) {
     return send(res, 400, { error: "Image is too large. Keep it under 3 MB." });

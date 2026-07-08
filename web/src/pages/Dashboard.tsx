@@ -25,6 +25,7 @@ import {
   IconCheck,
   IconCoins,
   IconExternal,
+  IconFlame,
   IconGauge,
   IconInfo,
   IconLock,
@@ -37,17 +38,10 @@ import {
   IconSparkles,
   IconTrash,
   IconUsers,
-  IconWallet,
 } from "../components/icons";
 import { TokenLogo } from "../components/TokenLogo";
-
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown }) => Promise<unknown>;
-    };
-  }
-}
+import { AddToWalletButton } from "../components/AddToWalletButton";
+import { buildTokenMetadataUri } from "../lib/metadata";
 
 type RoleKey = keyof typeof B20_ROLES;
 
@@ -109,11 +103,11 @@ const ROLE_HELP: Record<RoleKey, string> = {
   DEFAULT_ADMIN_ROLE: "Can grant and revoke roles, update cap and make final admin decisions.",
   MINT_ROLE: "Can create more supply. Use only while future minting is part of the plan.",
   BURN_ROLE: "Can burn tokens from its own balance and use burn memo functions.",
-  BURN_BLOCKED_ROLE: "Advanced policy role for blocked-account burn flows.",
+  BURN_BLOCKED_ROLE: "Advanced role for policy-blocked account burn flows.",
   PAUSE_ROLE: "Can pause transfers, minting or burning during emergencies.",
   UNPAUSE_ROLE: "Can turn paused features back on.",
-  METADATA_ROLE: "Can update name, symbol, contractURI and extra metadata like logoURI.",
-  OPERATOR_ROLE: "Advanced Asset role for multiplier changes and announcements.",
+  METADATA_ROLE: "Can update name, symbol, metadata URL and logo image URL.",
+  OPERATOR_ROLE: "Advanced role. Most tokens should leave this unused.",
 };
 
 export function Dashboard() {
@@ -239,7 +233,7 @@ export function Dashboard() {
         </header>
 
         <Card className="mb-6 border-sky-200/80 bg-sky-50/60 p-5 shadow-card dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
-          <Field label="B20 token address" hint="Native B20 token addresses are created by the Base B20 Factory precompile.">
+          <Field label="B20 token address" hint="Paste a Base mainnet B20 token address.">
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 value={manual}
@@ -317,7 +311,7 @@ export function Dashboard() {
       <Centered>
         <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />} title="Not a readable native B20 token">
           <p>
-            <code className="font-mono text-xs">{selected}</code> was not confirmed by the B20 Factory on {chainName(targetChainId)}.
+            <code className="font-mono text-xs">{selected}</code> was not confirmed as a native B20 token on {chainName(targetChainId)}.
           </p>
           <Link to="/dashboard" className="mt-2 inline-block underline">Back to token list</Link>
         </Callout>
@@ -360,7 +354,7 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Badge tone="positive"><IconCheck className="h-3 w-3" /> Factory created</Badge>
+            <Badge tone="positive"><IconCheck className="h-3 w-3" /> Native B20</Badge>
             {roleBadges.length > 0 ? roleBadges.slice(0, 4).map((role) => <Badge key={role} tone="accent">{role}</Badge>) : <Badge tone="neutral">Read-only wallet</Badge>}
             {visibleToken.paused.transfer || visibleToken.paused.mint || visibleToken.paused.burn ? (
               <Badge tone="warn"><IconPause className="h-3 w-3" /> Paused feature</Badge>
@@ -385,12 +379,13 @@ export function Dashboard() {
       )}
 
       <Callout tone="positive" icon={<IconInfo className="h-4 w-4" />} title="Native B20 on Base mainnet">
-        This token is created by the Base B20 Factory precompile. There is no user Solidity source to verify, so the BaseScan token page is the publish view.
+        No Solidity source upload is needed for this token. Share the BaseScan token page and dashboard link after launch.
       </Callout>
 
       <TxChainProvider chainId={targetChainId}>
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <MintPanel {...ctx} />
+          <BurnPanel {...ctx} />
           <SupplyCapPanel {...ctx} />
           <PausePanel {...ctx} />
           <MetadataPanel {...ctx} />
@@ -448,53 +443,6 @@ function MiniStat({ label, value, tone }: { label: string; value: React.ReactNod
   );
 }
 
-function AddToWalletButton({
-  token,
-  size = "md",
-  variant = "secondary",
-}: {
-  token: Pick<TokenView, "address" | "symbol" | "decimals" | "logoURI">;
-  size?: "sm" | "md";
-  variant?: "secondary" | "outline";
-}) {
-  const [status, setStatus] = useState<"idle" | "adding" | "done" | "error">("idle");
-  const supported = typeof window !== "undefined" && !!window.ethereum?.request;
-
-  async function add() {
-    if (!window.ethereum?.request) {
-      setStatus("error");
-      return;
-    }
-    setStatus("adding");
-    try {
-      await window.ethereum.request({
-        method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: {
-            address: token.address,
-            symbol: token.symbol,
-            decimals: token.decimals,
-            image: token.logoURI || undefined,
-          },
-        },
-      });
-      setStatus("done");
-      setTimeout(() => setStatus("idle"), 1600);
-    } catch {
-      setStatus("error");
-      setTimeout(() => setStatus("idle"), 2200);
-    }
-  }
-
-  return (
-    <Button type="button" size={size} variant={status === "done" ? "success" : variant} onClick={add} loading={status === "adding"} disabled={!supported} className="gap-1.5">
-      {status === "done" ? <IconCheck className="h-3.5 w-3.5" /> : <IconWallet className="h-3.5 w-3.5" />}
-      {status === "done" ? "Added" : status === "error" ? "Wallet unavailable" : "Add to wallet"}
-    </Button>
-  );
-}
-
 function MintPanel({ token, refetch }: Ctx) {
   const canMint = token.roles.MINT_ROLE;
   const [to, setTo] = useState("");
@@ -543,6 +491,77 @@ function MintPanel({ token, refetch }: Ctx) {
           {!withinCap(token, parsedBatch.total) && <p className="mt-1 text-xs text-negative">Batch total exceeds the supply cap.</p>}
           <TxButton className="mt-3" fullWidth variant="secondary" disabled={!batchReady} build={() => ({ address: token.address, abi: B20_ABI, functionName: "batchMint", args: [parsedBatch.recipients, parsedBatch.amounts] })} onSuccess={() => { setBatch(""); refetch(); }}>
             <IconUsers className="h-4 w-4" /> Batch mint
+          </TxButton>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function BurnPanel({ token, connected, refetch }: Ctx) {
+  const canBurn = token.roles.BURN_ROLE;
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const parsedAmount = parseTokenAmount(amount, token.decimals);
+  const memoHex = memoToBytes32(memo);
+  const burnPaused = token.paused.burn;
+  const baseReady = !!connected && canBurn && !burnPaused && parsedAmount !== null && parsedAmount > 0n && parsedAmount <= token.balance;
+  const memoReady = baseReady && !!memo.trim() && !!memoHex;
+
+  function reset() {
+    setAmount("");
+    setMemo("");
+    refetch();
+  }
+
+  return (
+    <SectionCard
+      icon={<IconFlame className="h-5 w-5" />}
+      title="Burn"
+      desc="Burn permanently removes tokens from your wallet and lowers total supply."
+      className="border-rose-200/80 bg-rose-50/55 dark:border-rose-400/20 dark:bg-rose-400/[0.07]"
+      iconClassName="border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200"
+    >
+      <div className="space-y-4">
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
+          Burning cannot be undone. Use normal burn for simple supply reduction, or burn with memo when you need an order ID or reason recorded.
+        </Callout>
+        {!canBurn && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Connected wallet does not hold BURN_ROLE.</Callout>}
+        {burnPaused && <Callout tone="negative" icon={<IconPause className="h-4 w-4" />}>Burning is currently paused for this token.</Callout>}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Metric label="Your balance" value={`${formatAmount(token.balance, token.decimals)} ${token.symbol}`} />
+          <Metric label="Total supply" value={`${formatAmount(token.totalSupply, token.decimals)} ${token.symbol}`} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={`Amount (${token.symbol})`}>
+            <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(cleanDecimal(e.target.value))} placeholder="100" disabled={!connected || !canBurn || burnPaused} />
+          </Field>
+          <Field label="Memo" hint="Optional, up to 32 bytes.">
+            <Input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="burn-001" disabled={!connected || !canBurn || burnPaused} />
+          </Field>
+        </div>
+        {parsedAmount !== null && parsedAmount > token.balance && <p className="text-xs text-negative">Amount exceeds your connected wallet balance.</p>}
+        {memo && !memoHex && <p className="text-xs text-negative">Memo is too long for bytes32.</p>}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <TxButton
+            fullWidth
+            variant="danger"
+            disabled={!baseReady}
+            build={() => parsedAmount ? { address: token.address, abi: B20_ABI, functionName: "burn", args: [parsedAmount] } : null}
+            onSuccess={reset}
+            confirmLabel="Burn these tokens permanently?"
+          >
+            <IconFlame className="h-4 w-4" /> Burn
+          </TxButton>
+          <TxButton
+            fullWidth
+            variant="outline"
+            disabled={!memoReady}
+            build={() => parsedAmount && memoHex ? { address: token.address, abi: B20_ABI, functionName: "burnWithMemo", args: [parsedAmount, memoHex] } : null}
+            onSuccess={reset}
+            confirmLabel="Burn these tokens permanently with memo?"
+          >
+            <IconFlame className="h-4 w-4" /> Burn with memo
           </TxButton>
         </div>
       </div>
@@ -663,17 +682,21 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     setLogoURI(token.logoURI);
   }, [token.address, token.name, token.symbol, token.contractURI, token.logoURI]);
 
+  const suggestedContractURI = logoURI.trim()
+    ? buildTokenMetadataUri({ name: name || token.name, symbol: symbol || token.symbol, image: logoURI })
+    : "";
+
   return (
     <SectionCard
       icon={<IconSparkles className="h-5 w-5" />}
       title="Metadata"
-      desc="Name, symbol, contractURI, and Asset extraMetadata use METADATA_ROLE."
+      desc="Update the token name, symbol, metadata URL and logo image."
       className={tones.meta.card}
       iconClassName={tones.meta.icon}
     >
       <div className="space-y-4">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Contract URI is a metadata JSON link. Logo URI is the image link saved as B20 extraMetadata. The app shows it immediately, while wallets and explorers may cache or index logos separately.
+          Metadata URL is a JSON link for wallets and explorers. Logo URI is the direct image link. The app shows it immediately, while external wallets may take time to index it.
         </Callout>
         {!canMetadata && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Connected wallet does not hold METADATA_ROLE.</Callout>}
         <div className="flex items-center gap-3 rounded-xl border border-violet-200/70 bg-surface/75 px-4 py-3 dark:border-violet-400/20">
@@ -699,13 +722,25 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
             </div>
           </Field>
         </div>
-        <Field label="Contract URI" hint="ERC-7572 contract metadata URI. Use https:// or ipfs://.">
+        <Field label="Metadata URL" hint="Use https:// or ipfs://. The logo helper can fill this for you.">
           <div className="flex gap-2">
             <Input value={contractURI} onChange={(e) => setContractURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
             <TxButton variant="secondary" disabled={!canMetadata || contractURI === token.contractURI} build={() => ({ address: token.address, abi: B20_ABI, functionName: "updateContractURI", args: [contractURI.trim()] })} onSuccess={refetch}>Save</TxButton>
           </div>
         </Field>
-        <Field label="Logo URI" hint='Stored as Asset extraMetadata key "logoURI".'>
+        {suggestedContractURI && (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" disabled={!canMetadata} onClick={() => setContractURI(suggestedContractURI)}>
+              Use logo metadata
+            </Button>
+            <a href={suggestedContractURI} target="_blank" rel="noreferrer">
+              <Button type="button" size="sm" variant="outline">
+                Preview JSON <IconExternal className="h-3.5 w-3.5" />
+              </Button>
+            </a>
+          </div>
+        )}
+        <Field label="Logo URI" hint="Direct PNG, JPG, WEBP or IPFS image link.">
           <div className="flex gap-2">
             <Input value={logoURI} onChange={(e) => setLogoURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
             <TxButton
@@ -784,7 +819,7 @@ function RolesPanel({ token, connected, refetch }: Ctx) {
         <div className="rounded-xl border border-rose-200/70 bg-rose-50/70 p-4 dark:border-rose-400/20 dark:bg-rose-400/[0.07]">
           <p className="text-sm font-medium">Admin renunciation</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            `renounceLastAdmin()` permanently removes the final DEFAULT_ADMIN_ROLE holder. Other granted roles keep working, but admin resurrection is blocked.
+            Renounce last admin permanently removes the final admin wallet. Other granted roles keep working, but admin powers cannot be restored.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <TxButton
@@ -869,14 +904,14 @@ function OperatorPanel({ token, refetch }: Ctx) {
   return (
     <SectionCard
       icon={<IconRocket className="h-5 w-5" />}
-      title="Asset operator"
-      desc="Asset multiplier updates require OPERATOR_ROLE."
+      title="Advanced operator"
+      desc="Most tokens should keep this unchanged."
       className={tones.ops.card}
       iconClassName={tones.ops.icon}
     >
       <div className="space-y-4">
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Advanced control. Most tokens should keep multiplier at 1.0, because changing it can confuse displayed balances.
+          Advanced control. Keep this at 1.0 unless you fully understand the effect, because changing it can confuse displayed balances.
         </Callout>
         <div className="grid gap-3 sm:grid-cols-2">
           <Metric label="Current multiplier" value={formatFull(token.multiplier, 18)} />
@@ -902,16 +937,16 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
     <SectionCard
       icon={<IconExternal className="h-5 w-5" />}
       title="BaseScan publish"
-      desc="Native B20 tokens are visible through the token page and factory event."
+      desc="Open and share the public token page."
       className={tones.picker.card}
       iconClassName={tones.picker.icon}
     >
       <div className="space-y-3">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          If BaseScan Contract tab shows Similar Match or constructor warning, that is expected for native B20. Use the token page, holders, transfers and info tabs. Do not run classic Solidity verification for this token.
+          If BaseScan shows a contract-source warning, do not treat it as a failed launch. For native B20, the token page, holders and transfers tabs are the public view.
         </Callout>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
-          Publish path: share the token address or token page. For logo and socials, update metadata here and submit token info on explorer or wallet indexers if they require manual review.
+          Share the token address or token page. For logo and socials, update metadata here and submit token info to explorer or wallet indexers if they require manual review.
         </Callout>
         <div className="grid gap-2 sm:grid-cols-2">
           <a href={`${explorerUrl(chainId)}/token/${token.address}`} target="_blank" rel="noreferrer">
@@ -921,7 +956,7 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
           </a>
           <a href={`${explorerUrl(chainId)}/address/${B20_FACTORY_ADDRESS}`} target="_blank" rel="noreferrer">
             <Button variant="outline" fullWidth className="gap-2">
-              Factory <IconExternal className="h-4 w-4" />
+              B20 creator <IconExternal className="h-4 w-4" />
             </Button>
           </a>
           <AddToWalletButton token={token} variant="outline" />

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { parseEventLogs, parseUnits } from "viem";
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import {
-  B20_CREATE_PARAMS_VERSION,
   B20_FACTORY_ABI,
   B20_FACTORY_ADDRESS,
   B20_VARIANT_ASSET,
@@ -42,12 +41,13 @@ import {
   IconRocket,
   IconSettings,
   IconShield,
-  IconSparkles,
   IconWallet,
 } from "../components/icons";
 import { WalletConnect } from "../components/WalletConnect";
 import { LogoPicker } from "../components/LogoPicker";
 import { TokenLogo } from "../components/TokenLogo";
+import { AddToWalletButton } from "../components/AddToWalletButton";
+import { buildTokenMetadataUri } from "../lib/metadata";
 
 interface FormState {
   name: string;
@@ -59,6 +59,7 @@ interface FormState {
   contractURI: string;
   logoURI: string;
   grantMinter: boolean;
+  grantBurner: boolean;
   grantPauser: boolean;
   grantMetadata: boolean;
   grantOperator: boolean;
@@ -74,6 +75,7 @@ const DEFAULTS: FormState = {
   contractURI: "",
   logoURI: "",
   grantMinter: true,
+  grantBurner: true,
   grantPauser: true,
   grantMetadata: true,
   grantOperator: false,
@@ -146,16 +148,20 @@ export function Create() {
 
   function buildConfig(): B20CreateConfig | null {
     if (!address || !decimalsOk || !supplyRaw || supplyRaw <= 0n || capRaw === null) return null;
+    const name = f.name.trim();
+    const symbol = f.symbol.trim().toUpperCase();
+    const logoURI = f.logoURI.trim();
     return {
-      name: f.name.trim(),
-      symbol: f.symbol.trim().toUpperCase(),
+      name,
+      symbol,
       decimals,
       admin: address,
       initialSupply: supplyRaw,
       supplyCap: capRaw,
-      contractURI: f.contractURI.trim(),
-      logoURI: f.logoURI.trim(),
+      contractURI: f.contractURI.trim() || (logoURI ? buildTokenMetadataUri({ name, symbol, image: logoURI }) : ""),
+      logoURI,
       grantMinter: f.grantMinter,
+      grantBurner: f.grantBurner,
       grantPauser: f.grantPauser,
       grantMetadata: f.grantMetadata,
       grantOperator: f.grantOperator,
@@ -248,6 +254,7 @@ export function Create() {
       capEnabled: true,
       supplyCap: nextCap,
       grantMinter: false,
+      grantBurner: true,
       grantPauser: false,
       grantMetadata: true,
       grantOperator: false,
@@ -264,44 +271,20 @@ export function Create() {
     if (!error) return "";
     if (error.message.includes("User rejected")) return "Transaction rejected.";
     if (/estimate|simulation|node service|gas/i.test(error.message)) {
-      return "Wallet simulation failed. Check that wallet network is Base, then retry. If the form passes, the factory call is already prepared with safe B20 bootstrap order.";
+      return "Wallet simulation failed. Check that wallet network is Base, then retry. The form already checks decimals, cap and roles before sending.";
     }
     return error.message.split("\n")[0].slice(0, 160);
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
-      <header className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8">
-        <div className="absolute inset-0 grid-dots opacity-55" />
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-transparent to-emerald-50 dark:from-sky-400/[0.08] dark:to-emerald-400/[0.08]" />
-        <div className="relative max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
-            <IconSparkles className="h-3.5 w-3.5" />
-            Native B20 factory
-          </span>
-          <h1 className="mt-5 font-display text-5xl leading-[0.98] text-fg sm:text-6xl">
-            Launch a native B20 token on Base.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-muted">
-            Create a Base-native Asset token through the B20 Factory precompile at{" "}
-            <strong className="text-fg">{chainName(targetChainId)}</strong>. No Solidity contract bytecode is deployed.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-2">
-            {["B20 Asset", "Factory precompile", "ERC-20 compatible", "Roles and supply cap"].map((item) => (
-              <span key={item} className="rounded-full border border-border bg-bg/80 px-3 py-1.5 text-xs font-medium text-muted">
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      </header>
-
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+      <h1 className="sr-only">Create B20 token</h1>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           <SectionCard
             icon={<IconCoins className="h-5 w-5" />}
             title="Token identity"
-            desc="Asset variant details are sealed through the native factory."
+            desc="Name, ticker, supply and logo."
             className={panel.basics.card}
             iconClassName={panel.basics.icon}
           >
@@ -325,7 +308,7 @@ export function Create() {
                 <Input inputMode="numeric" value={f.decimals} onChange={(e) => set("decimals", e.target.value.replace(/[^\d]/g, ""))} placeholder="18" />
               </Field>
               <div className="sm:col-span-2">
-                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="Stored as Asset extra metadata key logoURI.">
+                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="PNG or WEBP works best in wallets.">
                   <LogoPicker value={f.logoURI} onChange={(url) => set("logoURI", url)} symbol={f.symbol} />
                 </Field>
               </div>
@@ -334,8 +317,8 @@ export function Create() {
 
           <SectionCard
             icon={<IconSettings className="h-5 w-5" />}
-            title="B20 bootstrap"
-            desc="These initCalls are executed atomically by the B20 Factory after creation."
+            title="Launch settings"
+            desc="Choose cap and admin powers before launch."
             className={panel.standard.card}
             iconClassName={panel.standard.icon}
           >
@@ -343,7 +326,7 @@ export function Create() {
               <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-surface/80 px-4 py-3 dark:border-emerald-400/20 dark:bg-surface/70">
                 <div>
                   <p className="text-sm font-medium">Supply cap</p>
-                  <p className="text-xs text-muted">B20 cap max is uint128. No cap uses the uint128 max sentinel.</p>
+                  <p className="text-xs text-muted">Maximum supply allowed after launch.</p>
                 </div>
                 <Switch checked={f.capEnabled} onChange={(v) => set("capEnabled", v)} label="Cap supply" />
               </div>
@@ -352,15 +335,16 @@ export function Create() {
                   <Input inputMode="decimal" value={f.supplyCap} onChange={(e) => set("supplyCap", cleanDecimal(e.target.value))} placeholder="1000000" />
                 </Field>
               )}
-              <Field label="Contract URI" error={err("contractURI", errors.contractURI)} hint="Optional ERC-7572 metadata URI.">
+              <Field label="Metadata URL" error={err("contractURI", errors.contractURI)} hint="Optional. Logo upload auto adds this if blank.">
                 <Input value={f.contractURI} onChange={(e) => set("contractURI", e.target.value.trim())} placeholder="ipfs://... or https://..." />
               </Field>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <RoleToggle title="Minter role" desc="Allows minting after launch." checked={f.grantMinter} onChange={(v) => set("grantMinter", v)} />
+                <RoleToggle title="Burn role" desc="Allows your wallet to burn its own tokens." checked={f.grantBurner} onChange={(v) => set("grantBurner", v)} />
                 <RoleToggle title="Pause roles" desc="Allows pausing and unpausing transfers, minting or burning." checked={f.grantPauser} onChange={(v) => set("grantPauser", v)} />
-                <RoleToggle title="Metadata role" desc="Allows updating name, symbol and contract URI." checked={f.grantMetadata} onChange={(v) => set("grantMetadata", v)} />
-                <RoleToggle title="Operator role" desc="Allows Asset announcements and multiplier updates." checked={f.grantOperator} onChange={(v) => set("grantOperator", v)} />
+                <RoleToggle title="Metadata role" desc="Allows updating name, symbol and metadata URL." checked={f.grantMetadata} onChange={(v) => set("grantMetadata", v)} />
+                <RoleToggle title="Operator role" desc="Advanced. Most launches can leave this off." checked={f.grantOperator} onChange={(v) => set("grantOperator", v)} />
               </div>
 
               <Callout tone="neutral" icon={<IconShield className="h-4 w-4" />}>
@@ -381,6 +365,7 @@ export function Create() {
             onFixDecimals={() => set("decimals", "18")}
             onFixCap={matchCapToSupply}
             onMakeFixedSupply={() => set("grantMinter", false)}
+            onEnableBurn={() => set("grantBurner", true)}
             onDisablePause={() => set("grantPauser", false)}
           />
           <div className="mt-4">
@@ -407,7 +392,7 @@ export function Create() {
             <div className="mt-3">
               <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />} title="Wallet simulation tip">
                 If Rabby shows node service unavailable or fail to estimate gas, first make sure the wallet is on Base.
-                Then retry after a moment. The app validates cap, decimals and bootstrap roles before sending.
+                Then retry after a moment. The app validates cap, decimals and roles before sending.
               </Callout>
             </div>
           </div>
@@ -448,7 +433,7 @@ function PreviewCard({ f, supplyRaw, capRaw }: { f: FormState; supplyRaw: bigint
         <Row label="Decimals" value={f.decimals || "18"} />
         <Row label="Initial supply" value={supplyRaw && supplyRaw > 0n ? commafy(f.supply) : "-"} />
         <Row label="Supply cap" value={f.capEnabled && capRaw ? commafy(f.supplyCap) : "uint128 max"} />
-        <Row label="Factory" value="0xB20f..." />
+        <Row label="Network" value="Base mainnet" />
       </div>
     </Card>
   );
@@ -462,6 +447,7 @@ function B20ReportCard({
   onFixDecimals,
   onFixCap,
   onMakeFixedSupply,
+  onEnableBurn,
   onDisablePause,
 }: {
   f: FormState;
@@ -471,6 +457,7 @@ function B20ReportCard({
   onFixDecimals: () => void;
   onFixCap: () => void;
   onMakeFixedSupply: () => void;
+  onEnableBurn: () => void;
   onDisablePause: () => void;
 }) {
   const checks = [
@@ -492,7 +479,7 @@ function B20ReportCard({
           action: "Use 18",
           onAction: onFixDecimals,
         },
-    { tone: "positive" as const, label: "Factory route", text: `Uses createB20 params version ${B20_CREATE_PARAMS_VERSION} on the fixed B20 Factory precompile.` },
+    { tone: "positive" as const, label: "Base launch", text: "Uses the official native B20 launch flow on Base mainnet." },
     f.capEnabled
       ? { tone: "positive" as const, label: "Supply cap", text: "Cap is enabled. Keep it at planned max supply or higher than current total supply." }
       : {
@@ -510,7 +497,16 @@ function B20ReportCard({
           action: "Make fixed",
           onAction: onMakeFixedSupply,
         }
-      : { tone: "positive" as const, label: "Mint role", text: "Bootstrap mint still works, then no minter role remains." },
+      : { tone: "positive" as const, label: "Mint role", text: "Initial supply is created, then future minting is turned off." },
+    f.grantBurner
+      ? { tone: "positive" as const, label: "Burn role", text: "Burn panel will work for your connected wallet." }
+      : {
+          tone: "warn" as const,
+          label: "Burn role",
+          text: "Burn panel needs BURN_ROLE. Enable it if you want burn controls after launch.",
+          action: "Enable",
+          onAction: onEnableBurn,
+        },
     f.grantPauser
       ? {
           tone: "warn" as const,
@@ -618,9 +614,13 @@ function SuccessModal({
               </Button>
             </Link>
           </div>
+          <AddToWalletButton
+            token={{ address: address as `0x${string}`, symbol: cfg.symbol, decimals: cfg.decimals, logoURI: cfg.logoURI }}
+            variant="outline"
+          />
 
           <Callout tone="positive" icon={<IconWallet className="h-4 w-4" />}>
-            Initial supply was minted through the factory bootstrap call to your connected wallet.
+            Initial supply was created and sent to your connected wallet.
           </Callout>
         </div>
       )}
