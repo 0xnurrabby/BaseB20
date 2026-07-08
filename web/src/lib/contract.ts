@@ -177,9 +177,10 @@ export function buildB20InitCalls(config: B20CreateConfig): `0x${string}`[] {
   const calls: `0x${string}`[] = [
     encodeFunctionData({ abi: B20_ABI, functionName: "updateSupplyCap", args: [config.supplyCap] }),
   ];
+  const needsBootstrapMint = config.initialSupply > 0n;
 
   const grants: Array<readonly [`0x${string}`, boolean]> = [
-    [B20_ROLES.MINT_ROLE, config.grantMinter],
+    [B20_ROLES.MINT_ROLE, config.grantMinter || needsBootstrapMint],
     [B20_ROLES.PAUSE_ROLE, config.grantPauser],
     [B20_ROLES.UNPAUSE_ROLE, config.grantPauser],
     [B20_ROLES.METADATA_ROLE, config.grantMetadata],
@@ -200,8 +201,11 @@ export function buildB20InitCalls(config: B20CreateConfig): `0x${string}`[] {
     calls.push(encodeFunctionData({ abi: B20_ABI, functionName: "updateExtraMetadata", args: ["logoURI", config.logoURI.trim()] }));
   }
 
-  if (config.initialSupply > 0n) {
+  if (needsBootstrapMint) {
     calls.push(encodeFunctionData({ abi: B20_ABI, functionName: "batchMint", args: [[config.admin], [config.initialSupply]] }));
+    if (!config.grantMinter) {
+      calls.push(encodeFunctionData({ abi: B20_ABI, functionName: "revokeRole", args: [B20_ROLES.MINT_ROLE, config.admin] }));
+    }
   }
 
   return calls;

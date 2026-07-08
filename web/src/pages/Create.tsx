@@ -38,6 +38,7 @@ import {
   IconCoins,
   IconExternal,
   IconGauge,
+  IconInfo,
   IconRocket,
   IconSettings,
   IconShield,
@@ -46,6 +47,7 @@ import {
 } from "../components/icons";
 import { WalletConnect } from "../components/WalletConnect";
 import { LogoPicker } from "../components/LogoPicker";
+import { TokenLogo } from "../components/TokenLogo";
 
 interface FormState {
   name: string;
@@ -229,6 +231,44 @@ export function Create() {
     setSavedHash("");
   }
 
+  function applyStandardFixes() {
+    const parsedSupply = decimalsOk ? parseTokenAmount(f.supply, decimals) : null;
+    const nextSupply = parsedSupply && parsedSupply > 0n ? f.supply : DEFAULTS.supply;
+    const nextCap =
+      f.capEnabled && capRaw !== null && parsedSupply !== null && capRaw >= parsedSupply && capRaw > 0n
+        ? f.supplyCap
+        : nextSupply;
+
+    setF((current) => ({
+      ...current,
+      name: current.name.trim() || "My B20 Token",
+      symbol: (current.symbol.trim() || "B20").slice(0, 11).toUpperCase(),
+      supply: nextSupply,
+      decimals: "18",
+      capEnabled: true,
+      supplyCap: nextCap,
+      grantMinter: false,
+      grantPauser: false,
+      grantMetadata: true,
+      grantOperator: false,
+    }));
+    setTouched({});
+  }
+
+  function matchCapToSupply() {
+    setF((current) => ({ ...current, capEnabled: true, supplyCap: current.supply.trim() || DEFAULTS.supply }));
+    setTouched((current) => ({ ...current, supplyCap: true }));
+  }
+
+  function friendlyCreateError() {
+    if (!error) return "";
+    if (error.message.includes("User rejected")) return "Transaction rejected.";
+    if (/estimate|simulation|node service|gas/i.test(error.message)) {
+      return "Wallet simulation failed. Check that wallet network is Base, then retry. If the form passes, the factory call is already prepared with safe B20 bootstrap order.";
+    }
+    return error.message.split("\n")[0].slice(0, 160);
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
       <header className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8">
@@ -333,7 +373,16 @@ export function Create() {
 
         <div className="lg:sticky lg:top-24 lg:h-fit">
           <PreviewCard f={f} supplyRaw={supplyRaw} capRaw={capRaw} />
-          <B20ReportCard f={f} decimalsOk={decimalsOk} hasErrors={hasErrors} />
+          <B20ReportCard
+            f={f}
+            decimalsOk={decimalsOk}
+            hasErrors={hasErrors}
+            onFixAll={applyStandardFixes}
+            onFixDecimals={() => set("decimals", "18")}
+            onFixCap={matchCapToSupply}
+            onMakeFixedSupply={() => set("grantMinter", false)}
+            onDisablePause={() => set("grantPauser", false)}
+          />
           <div className="mt-4">
             {!isConnected ? (
               <Card className="border-violet-200/80 bg-violet-50/60 p-4 text-center dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
@@ -354,11 +403,13 @@ export function Create() {
             )}
             {hasErrors && isConnected && supported && <p className="mt-2 text-center text-xs text-negative">Fix the highlighted fields to continue.</p>}
             {networkError && <p className="mt-2 text-center text-xs text-negative">{networkError}</p>}
-            {error && (
-              <p className="mt-2 text-center text-xs text-negative">
-                {error.message.includes("User rejected") ? "Transaction rejected." : error.message.split("\n")[0].slice(0, 140)}
-              </p>
-            )}
+            {error && <p className="mt-2 text-center text-xs text-negative">{friendlyCreateError()}</p>}
+            <div className="mt-3">
+              <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />} title="Wallet simulation tip">
+                If Rabby shows node service unavailable or fail to estimate gas, first make sure the wallet is on Base.
+                Then retry after a moment. The app validates cap, decimals and bootstrap roles before sending.
+              </Callout>
+            </div>
           </div>
         </div>
       </div>
@@ -386,13 +437,7 @@ function PreviewCard({ f, supplyRaw, capRaw }: { f: FormState; supplyRaw: bigint
     <Card className="overflow-hidden border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
       <div className="h-1 bg-gradient-to-r from-sky-300 via-emerald-200 to-violet-200 dark:from-sky-400/50 dark:via-emerald-400/30 dark:to-violet-400/30" />
       <div className="flex items-center gap-3 border-b border-sky-200/70 bg-surface/80 px-5 py-4 dark:border-sky-400/20 dark:bg-surface/70">
-        {f.logoURI ? (
-          <img src={f.logoURI} alt="" className="h-11 w-11 rounded-full border border-border object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-        ) : (
-          <span className="grid h-11 w-11 place-items-center rounded-full border border-sky-200 bg-sky-100 font-mono text-sm font-semibold text-sky-800 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
-            {symbol.slice(0, 3)}
-          </span>
-        )}
+        <TokenLogo src={f.logoURI} symbol={symbol} size="md" tone="sky" />
         <div className="min-w-0">
           <p className="truncate font-display text-2xl leading-none text-fg">{f.name.trim() || "Your B20 Token"}</p>
           <p className="font-mono text-xs text-muted">${symbol}</p>
@@ -409,20 +454,71 @@ function PreviewCard({ f, supplyRaw, capRaw }: { f: FormState; supplyRaw: bigint
   );
 }
 
-function B20ReportCard({ f, decimalsOk, hasErrors }: { f: FormState; decimalsOk: boolean; hasErrors: boolean }) {
+function B20ReportCard({
+  f,
+  decimalsOk,
+  hasErrors,
+  onFixAll,
+  onFixDecimals,
+  onFixCap,
+  onMakeFixedSupply,
+  onDisablePause,
+}: {
+  f: FormState;
+  decimalsOk: boolean;
+  hasErrors: boolean;
+  onFixAll: () => void;
+  onFixDecimals: () => void;
+  onFixCap: () => void;
+  onMakeFixedSupply: () => void;
+  onDisablePause: () => void;
+}) {
   const checks = [
     hasErrors
-      ? { tone: "negative" as const, label: "Input validation", text: "Fix highlighted fields before creating the token." }
+      ? {
+          tone: "negative" as const,
+          label: "Input validation",
+          text: "Missing or invalid fields block creation. Auto-fix fills safe launch defaults.",
+          action: "Auto-fix",
+          onAction: onFixAll,
+        }
       : { tone: "positive" as const, label: "Input validation", text: "Name, symbol, decimals and supply cap pass local checks." },
     decimalsOk
       ? { tone: "positive" as const, label: "Asset decimals", text: "B20 Asset decimals are inside the required 6-18 range." }
-      : { tone: "negative" as const, label: "Asset decimals", text: "Native B20 Asset tokens only support decimals from 6 to 18." },
+      : {
+          tone: "negative" as const,
+          label: "Asset decimals",
+          text: "Native B20 Asset tokens only support decimals from 6 to 18.",
+          action: "Use 18",
+          onAction: onFixDecimals,
+        },
     { tone: "positive" as const, label: "Factory route", text: `Uses createB20 params version ${B20_CREATE_PARAMS_VERSION} on the fixed B20 Factory precompile.` },
+    f.capEnabled
+      ? { tone: "positive" as const, label: "Supply cap", text: "Cap is enabled. Keep it at planned max supply or higher than current total supply." }
+      : {
+          tone: "warn" as const,
+          label: "Supply cap",
+          text: "No cap uses uint128 max. For public launches, a fixed cap is easier to trust.",
+          action: "Match supply",
+          onAction: onFixCap,
+        },
     f.grantMinter
-      ? { tone: "warn" as const, label: "Mint role", text: "Minter role remains active after launch. Revoke it when supply is complete." }
-      : { tone: "positive" as const, label: "Mint role", text: "No minter role is granted after the bootstrap mint." },
+      ? {
+          tone: "warn" as const,
+          label: "Mint role",
+          text: "Minter role remains active after launch. For fixed supply, turn it off.",
+          action: "Make fixed",
+          onAction: onMakeFixedSupply,
+        }
+      : { tone: "positive" as const, label: "Mint role", text: "Bootstrap mint still works, then no minter role remains." },
     f.grantPauser
-      ? { tone: "warn" as const, label: "Pause roles", text: "Pause controls are operational admin powers. Use transparently." }
+      ? {
+          tone: "warn" as const,
+          label: "Pause roles",
+          text: "Pause controls are admin powers. Keep them only if you need emergency controls.",
+          action: "Disable",
+          onAction: onDisablePause,
+        }
       : { tone: "positive" as const, label: "Pause roles", text: "No pause role is granted." },
   ];
   const review = checks.filter((c) => c.tone === "warn").length;
@@ -438,7 +534,7 @@ function B20ReportCard({ f, decimalsOk, hasErrors }: { f: FormState; decimalsOk:
           </span>
           <div>
             <p className="text-sm font-semibold">B20 standard check</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Factory, variant and role setup checks.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Errors block launch. Warnings are admin-risk choices you can fix with one click.</p>
           </div>
         </div>
         <Badge tone={fail ? "negative" : review ? "warn" : "positive"}>{score}/100</Badge>
@@ -449,10 +545,15 @@ function B20ReportCard({ f, decimalsOk, hasErrors }: { f: FormState; decimalsOk:
             <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full", check.tone === "positive" ? "bg-positive/10 text-positive" : check.tone === "warn" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-negative/10 text-negative")}>
               {check.tone === "positive" ? <IconCheck className="h-3.5 w-3.5" /> : <IconAlert className="h-3.5 w-3.5" />}
             </span>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-fg">{check.label}</p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{check.text}</p>
             </div>
+            {"action" in check && check.action && (
+              <Button type="button" size="sm" variant={check.tone === "negative" ? "secondary" : "outline"} onClick={check.onAction} className="shrink-0">
+                {check.action}
+              </Button>
+            )}
           </div>
         ))}
       </div>

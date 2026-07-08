@@ -209,6 +209,8 @@ const SECTIONS: Section[] = [
           <li><b>Metadata.</b> Update name, symbol, contractURI and Asset extraMetadata such as logoURI.</li>
           <li><b>Roles.</b> Grant, revoke and renounce built-in roles from the dashboard.</li>
           <li><b>Memo transfer.</b> Send normal token transfers with a bytes32 memo.</li>
+          <li><b>Add to wallet.</b> Import the token into supported wallets with address, symbol, decimals and logo image.</li>
+          <li><b>BaseScan publish.</b> Open token, factory and share links from the dashboard without classic source verification.</li>
         </Ol>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
           The dashboard no longer includes trade fees, DEX-pair registration, custom denylist controls, or
@@ -259,6 +261,15 @@ const SECTIONS: Section[] = [
           For users, the correct publish path is to open the token page on BaseScan and share the token address. The
           dashboard links directly to the token page and the factory page.
         </P>
+        <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
+          If BaseScan's Contract tab shows a Similar Match or constructor warning, do not treat it as a failed launch.
+          Native B20 tokens use Base's shared implementation, so the token page, holders, transfers and info tabs are
+          the right public view.
+        </Callout>
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
+          Wallet and explorer logos may be cached by external indexers. Save logoURI on-chain, use Add to wallet where
+          supported, and submit token info to the explorer or wallet indexer if they require manual review.
+        </Callout>
       </>
     ),
   },
@@ -277,6 +288,7 @@ const SECTIONS: Section[] = [
           <li>Keep supply cap at or above planned maximum supply.</li>
           <li>Grant pause roles only to wallets that should handle emergencies.</li>
           <li>Set contractURI and logoURI before sharing the token publicly.</li>
+          <li>Use the dashboard BaseScan and Add to wallet actions after launch so users can open the correct token.</li>
           <li>Renounce the final admin only when no future admin updates are needed.</li>
         </Ol>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
