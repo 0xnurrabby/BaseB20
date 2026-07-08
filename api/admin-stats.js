@@ -51,7 +51,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const sql = await db();
-    const [totals, daily, recentTokens, topPages, activeWallets] = await Promise.all([
+    const [totals, windows, daily, hourly, recentTokens, topPages, activeWallets, topWallets, recentEvents] = await Promise.all([
       sql.query(`
         SELECT
           COUNT(*) FILTER (WHERE event_type = 'page_view') AS page_views,
@@ -59,6 +59,25 @@ module.exports = async function handler(req, res) {
           COUNT(*) FILTER (WHERE event_type = 'token_created') AS tokens_created,
           COUNT(DISTINCT wallet) FILTER (WHERE wallet IS NOT NULL) AS wallets_seen,
           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h
+        FROM analytics_events
+      `),
+      sql.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS events_24h,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS events_7d,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS events_30d,
+          COUNT(*) FILTER (WHERE event_type = 'page_view' AND created_at >= NOW() - INTERVAL '24 hours') AS views_24h,
+          COUNT(*) FILTER (WHERE event_type = 'page_view' AND created_at >= NOW() - INTERVAL '7 days') AS views_7d,
+          COUNT(*) FILTER (WHERE event_type = 'page_view' AND created_at >= NOW() - INTERVAL '30 days') AS views_30d,
+          COUNT(DISTINCT session_id) FILTER (WHERE event_type = 'page_view' AND created_at >= NOW() - INTERVAL '24 hours') AS visitors_24h,
+          COUNT(DISTINCT session_id) FILTER (WHERE event_type = 'page_view' AND created_at >= NOW() - INTERVAL '7 days') AS visitors_7d,
+          COUNT(DISTINCT session_id) FILTER (WHERE event_type = 'page_view' AND created_at >= NOW() - INTERVAL '30 days') AS visitors_30d,
+          COUNT(*) FILTER (WHERE event_type = 'token_created' AND created_at >= NOW() - INTERVAL '24 hours') AS tokens_24h,
+          COUNT(*) FILTER (WHERE event_type = 'token_created' AND created_at >= NOW() - INTERVAL '7 days') AS tokens_7d,
+          COUNT(*) FILTER (WHERE event_type = 'token_created' AND created_at >= NOW() - INTERVAL '30 days') AS tokens_30d,
+          COUNT(DISTINCT wallet) FILTER (WHERE wallet IS NOT NULL AND created_at >= NOW() - INTERVAL '24 hours') AS wallets_24h,
+          COUNT(DISTINCT wallet) FILTER (WHERE wallet IS NOT NULL AND created_at >= NOW() - INTERVAL '7 days') AS wallets_7d,
+          COUNT(DISTINCT wallet) FILTER (WHERE wallet IS NOT NULL AND created_at >= NOW() - INTERVAL '30 days') AS wallets_30d
         FROM analytics_events
       `),
       sql.query(`
@@ -76,6 +95,29 @@ module.exports = async function handler(req, res) {
           GROUP BY 1
         ) e ON e.d = day
         ORDER BY day
+      `),
+      sql.query(`
+        WITH hours AS (
+          SELECT generate_series(
+            date_trunc('hour', NOW()) - INTERVAL '23 hours',
+            date_trunc('hour', NOW()),
+            INTERVAL '1 hour'
+          ) AS hour
+        )
+        SELECT
+          to_char(hours.hour, 'HH24:00') AS hour,
+          COALESCE(e.page_views, 0) AS page_views,
+          COALESCE(e.tokens_created, 0) AS tokens_created
+        FROM hours
+        LEFT JOIN (
+          SELECT date_trunc('hour', created_at) AS h,
+            COUNT(*) FILTER (WHERE event_type = 'page_view') AS page_views,
+            COUNT(*) FILTER (WHERE event_type = 'token_created') AS tokens_created
+          FROM analytics_events
+          WHERE created_at >= NOW() - INTERVAL '24 hours'
+          GROUP BY 1
+        ) e ON e.h = hours.hour
+        ORDER BY hours.hour
       `),
       sql.query(`
         SELECT token_address, token_name, token_symbol, wallet, tx_hash, chain_id, created_at
@@ -100,10 +142,28 @@ module.exports = async function handler(req, res) {
         ORDER BY last_seen DESC
         LIMIT 8
       `),
+      sql.query(`
+        SELECT wallet,
+          COUNT(*) FILTER (WHERE event_type = 'page_view') AS page_views,
+          COUNT(*) FILTER (WHERE event_type = 'token_created') AS tokens_created,
+          MAX(created_at) AS last_seen
+        FROM analytics_events
+        WHERE wallet IS NOT NULL
+        GROUP BY wallet
+        ORDER BY tokens_created DESC, last_seen DESC
+        LIMIT 8
+      `),
+      sql.query(`
+        SELECT event_type, wallet, token_address, token_name, token_symbol, chain_id, page_path, tx_hash, created_at
+        FROM analytics_events
+        ORDER BY created_at DESC
+        LIMIT 20
+      `),
     ]);
 
     return send(res, 200, {
       admin,
+      generatedAt: new Date().toISOString(),
       totals: {
         pageViews: toNumber(totals[0]?.page_views),
         visitors: toNumber(totals[0]?.visitors),
@@ -111,8 +171,36 @@ module.exports = async function handler(req, res) {
         walletsSeen: toNumber(totals[0]?.wallets_seen),
         events24h: toNumber(totals[0]?.events_24h),
       },
+      windows: {
+        day: {
+          events: toNumber(windows[0]?.events_24h),
+          pageViews: toNumber(windows[0]?.views_24h),
+          visitors: toNumber(windows[0]?.visitors_24h),
+          tokensCreated: toNumber(windows[0]?.tokens_24h),
+          walletsSeen: toNumber(windows[0]?.wallets_24h),
+        },
+        week: {
+          events: toNumber(windows[0]?.events_7d),
+          pageViews: toNumber(windows[0]?.views_7d),
+          visitors: toNumber(windows[0]?.visitors_7d),
+          tokensCreated: toNumber(windows[0]?.tokens_7d),
+          walletsSeen: toNumber(windows[0]?.wallets_7d),
+        },
+        month: {
+          events: toNumber(windows[0]?.events_30d),
+          pageViews: toNumber(windows[0]?.views_30d),
+          visitors: toNumber(windows[0]?.visitors_30d),
+          tokensCreated: toNumber(windows[0]?.tokens_30d),
+          walletsSeen: toNumber(windows[0]?.wallets_30d),
+        },
+      },
       daily: daily.map((r) => ({
         day: r.day,
+        pageViews: toNumber(r.page_views),
+        tokensCreated: toNumber(r.tokens_created),
+      })),
+      hourly: hourly.map((r) => ({
+        hour: r.hour,
         pageViews: toNumber(r.page_views),
         tokensCreated: toNumber(r.tokens_created),
       })),
@@ -122,6 +210,23 @@ module.exports = async function handler(req, res) {
         wallet: r.wallet,
         tokensCreated: toNumber(r.tokens_created),
         lastSeen: r.last_seen,
+      })),
+      topWallets: topWallets.map((r) => ({
+        wallet: r.wallet,
+        pageViews: toNumber(r.page_views),
+        tokensCreated: toNumber(r.tokens_created),
+        lastSeen: r.last_seen,
+      })),
+      recentEvents: recentEvents.map((r) => ({
+        eventType: r.event_type,
+        wallet: r.wallet,
+        tokenAddress: r.token_address,
+        tokenName: r.token_name,
+        tokenSymbol: r.token_symbol,
+        chainId: r.chain_id,
+        pagePath: r.page_path,
+        txHash: r.tx_hash,
+        createdAt: r.created_at,
       })),
     });
   } catch {

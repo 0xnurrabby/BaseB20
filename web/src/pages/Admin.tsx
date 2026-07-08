@@ -18,6 +18,7 @@ import {
 } from "../components/icons";
 
 interface Summary {
+  generatedAt: string;
   totals: {
     pageViews: number;
     visitors: number;
@@ -25,7 +26,13 @@ interface Summary {
     walletsSeen: number;
     events24h: number;
   };
+  windows: {
+    day: WindowSummary;
+    week: WindowSummary;
+    month: WindowSummary;
+  };
   daily: Array<{ day: string; pageViews: number; tokensCreated: number }>;
+  hourly: Array<{ hour: string; pageViews: number; tokensCreated: number }>;
   recentTokens: Array<{
     token_address: string | null;
     token_name: string | null;
@@ -37,6 +44,26 @@ interface Summary {
   }>;
   topPages: Array<{ pagePath: string; views: number }>;
   activeWallets: Array<{ wallet: string; tokensCreated: number; lastSeen: string }>;
+  topWallets: Array<{ wallet: string; pageViews: number; tokensCreated: number; lastSeen: string }>;
+  recentEvents: Array<{
+    eventType: string;
+    wallet: string | null;
+    tokenAddress: string | null;
+    tokenName: string | null;
+    tokenSymbol: string | null;
+    chainId: number | null;
+    pagePath: string | null;
+    txHash: string | null;
+    createdAt: string;
+  }>;
+}
+
+interface WindowSummary {
+  events: number;
+  pageViews: number;
+  visitors: number;
+  tokensCreated: number;
+  walletsSeen: number;
 }
 
 type LoadState = "idle" | "loading" | "ready" | "denied" | "error";
@@ -158,16 +185,27 @@ export function Admin() {
 }
 
 function AdminDashboard({ summary }: { summary: Summary }) {
+  const conversion =
+    summary.totals.visitors > 0 ? ((summary.totals.tokensCreated / summary.totals.visitors) * 100).toFixed(1) : "0.0";
   const stats = [
     { label: "Visitors", value: summary.totals.visitors, icon: IconUsers, tone: "positive" },
     { label: "Page views", value: summary.totals.pageViews, icon: IconGauge, tone: "neutral" },
     { label: "Tokens created", value: summary.totals.tokensCreated, icon: IconCoins, tone: "accent" },
     { label: "Wallets seen", value: summary.totals.walletsSeen, icon: IconShield, tone: "neutral" },
+    { label: "Create rate", value: `${conversion}%`, icon: IconTrendUp, tone: "positive" },
   ] as const;
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold">Admin overview</p>
+          <p className="mt-1 text-xs text-muted">Updated {formatDate(summary.generatedAt)}</p>
+        </div>
+        <Badge tone="positive"><IconTrendUp className="h-3 w-3" /> Live analytics</Badge>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map(({ label, value, icon: Icon, tone }) => (
           <Card key={label} className="p-4">
             <div className="flex items-center justify-between">
@@ -176,12 +214,20 @@ function AdminDashboard({ summary }: { summary: Summary }) {
               </span>
               <Badge tone={tone}>{label}</Badge>
             </div>
-            <p className="mt-5 text-3xl font-semibold tracking-tight">{value.toLocaleString()}</p>
+            <p className="mt-5 text-3xl font-semibold tracking-tight">
+              {typeof value === "number" ? value.toLocaleString() : value}
+            </p>
           </Card>
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.45fr_0.9fr]">
+      <div className="grid gap-3 lg:grid-cols-3">
+        <WindowCard label="Last 24h" data={summary.windows.day} />
+        <WindowCard label="Last 7d" data={summary.windows.week} />
+        <WindowCard label="Last 30d" data={summary.windows.month} />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -194,12 +240,46 @@ function AdminDashboard({ summary }: { summary: Summary }) {
         </Card>
 
         <Card className="p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">24-hour pulse</h2>
+              <p className="mt-1 text-xs text-muted">Hourly page views and token creates.</p>
+            </div>
+            <Badge tone="neutral">Hourly</Badge>
+          </div>
+          <HourlyChart data={summary.hourly} />
+        </Card>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card className="p-5">
           <h2 className="mb-4 text-sm font-semibold">Top pages</h2>
           <div className="space-y-3">
             {summary.topPages.length === 0 ? (
               <p className="text-sm text-muted">No page views yet.</p>
             ) : (
               summary.topPages.map((p) => <ProgressRow key={p.pagePath} label={p.pagePath} value={p.views} max={summary.topPages[0]?.views ?? 1} />)
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="mb-4 text-sm font-semibold">Top wallets</h2>
+          <div className="space-y-3">
+            {summary.topWallets.length === 0 ? (
+              <p className="text-sm text-muted">No wallet data yet.</p>
+            ) : (
+              summary.topWallets.map((w) => (
+                <div key={w.wallet}>
+                  <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                    <span className="font-mono text-muted">{shortAddress(w.wallet, 6)}</span>
+                    <span className="text-faint">{w.tokensCreated} tokens | {w.pageViews} views</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-border">
+                    <div className="h-full rounded-full bg-positive" style={{ width: `${Math.max(6, Math.min(100, w.tokensCreated * 20 + w.pageViews * 4))}%` }} />
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </Card>
@@ -221,22 +301,43 @@ function AdminDashboard({ summary }: { summary: Summary }) {
 
         <Card className="overflow-hidden">
           <div className="border-b border-border px-5 py-4">
-            <h2 className="text-sm font-semibold">Active wallets</h2>
+            <h2 className="text-sm font-semibold">Recent events</h2>
           </div>
           <div className="divide-y divide-border">
-            {summary.activeWallets.length === 0 ? (
-              <p className="px-5 py-8 text-sm text-muted">No wallet activity yet.</p>
+            {summary.recentEvents.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-muted">No events yet.</p>
             ) : (
-              summary.activeWallets.map((w) => (
-                <div key={w.wallet} className="flex items-center justify-between px-5 py-3">
-                  <span className="font-mono text-xs">{shortAddress(w.wallet, 6)}</span>
-                  <Badge tone="neutral">{w.tokensCreated} tokens</Badge>
-                </div>
-              ))
+              summary.recentEvents.map((event, i) => <EventRow key={`${event.createdAt}-${i}`} event={event} />)
             )}
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function WindowCard({ label, data }: { label: string; data: WindowSummary }) {
+  return (
+    <Card className="border-sky-200/70 bg-sky-50/45 p-4 dark:border-sky-400/20 dark:bg-sky-400/[0.06]">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">{label}</p>
+        <Badge tone="neutral">{data.events.toLocaleString()} events</Badge>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <MiniMetric label="Views" value={data.pageViews} />
+        <MiniMetric label="Visitors" value={data.visitors} />
+        <MiniMetric label="Tokens" value={data.tokensCreated} />
+        <MiniMetric label="Wallets" value={data.walletsSeen} />
+      </div>
+    </Card>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface/80 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-faint">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold text-fg">{value.toLocaleString()}</p>
     </div>
   );
 }
@@ -283,6 +384,36 @@ function ActivityChart({ data }: { data: Summary["daily"] }) {
   );
 }
 
+function HourlyChart({ data }: { data: Summary["hourly"] }) {
+  const max = Math.max(1, ...data.map((d) => Math.max(d.pageViews, d.tokensCreated)));
+  return (
+    <div>
+      <div className="flex h-64 items-end gap-1">
+        {data.map((d) => {
+          const views = Math.max(3, (d.pageViews / max) * 100);
+          const tokens = Math.max(d.tokensCreated > 0 ? 5 : 0, (d.tokensCreated / max) * 100);
+          return (
+            <div key={d.hour} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              <div className="relative flex h-52 w-full items-end justify-center rounded-t-lg bg-border/35">
+                <span className="absolute bottom-0 w-2/3 rounded-t bg-positive/65" style={{ height: `${views}%` }} />
+                {tokens > 0 && <span className="absolute bottom-0 w-1/3 rounded-t bg-accent/70" style={{ height: `${tokens}%` }} />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[11px] text-faint">
+        <span>{data[0]?.hour ?? ""}</span>
+        <span className="inline-flex items-center gap-3">
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-positive" /> Views</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-accent" /> Tokens</span>
+        </span>
+        <span>{data[data.length - 1]?.hour ?? ""}</span>
+      </div>
+    </div>
+  );
+}
+
 function ProgressRow({ label, value, max }: { label: string; value: number; max: number }) {
   const pct = Math.max(4, Math.round((value / Math.max(1, max)) * 100));
   return (
@@ -320,4 +451,43 @@ function TokenRow({ token }: { token: Summary["recentTokens"][number] }) {
       )}
     </div>
   );
+}
+
+function EventRow({ event }: { event: Summary["recentEvents"][number] }) {
+  const isToken = event.eventType === "token_created";
+  const label = isToken ? "Token created" : "Page view";
+  const title = isToken
+    ? `${event.tokenName || "Token"} ${event.tokenSymbol ? `$${event.tokenSymbol}` : ""}`.trim()
+    : event.pagePath || "/";
+  const addr = event.tokenAddress ?? "";
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <Badge tone={isToken ? "accent" : "neutral"}>{label}</Badge>
+          <span className="text-[11px] text-faint">{formatDate(event.createdAt)}</span>
+        </div>
+        <p className="mt-1 truncate text-sm font-medium text-fg">{title}</p>
+        {event.wallet && <p className="mt-0.5 font-mono text-xs text-faint">{shortAddress(event.wallet, 6)}</p>}
+      </div>
+      {addr && (
+        <a
+          href={`${explorerUrl(event.chainId ?? 84532)}/address/${addr}`}
+          target="_blank"
+          rel="noreferrer"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint hover:bg-border/50 hover:text-fg"
+        >
+          <IconExternal className="h-4 w-4" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Just now";
+  return date.toLocaleString();
 }
