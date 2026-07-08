@@ -3,24 +3,19 @@ import { Link } from "react-router-dom";
 import { Callout, cn } from "../components/ui";
 import {
   IconAlert,
-  IconArrowRight,
   IconBook,
   IconCheck,
-  IconCoins,
-  IconFlame,
+  IconExternal,
   IconGauge,
   IconInfo,
-  IconLink,
-  IconLifebuoy,
   IconLock,
   IconRocket,
-  IconSend,
   IconShield,
   IconSparkles,
-  IconTrendUp,
   IconUsers,
   IconWallet,
 } from "../components/icons";
+import { ACTIVATION_REGISTRY_ADDRESS, B20_FACTORY_ADDRESS, MAX_UINT128, POLICY_REGISTRY_ADDRESS } from "../lib/contract";
 
 type Tone = "sky" | "mint" | "amber" | "rose" | "violet" | "cyan" | "lime";
 
@@ -34,390 +29,260 @@ interface Section {
   body: ReactNode;
 }
 
-const toneStyles: Record<Tone, { card: string; badge: string; icon: string; glow: string; rule: string }> = {
+const toneStyles: Record<Tone, { card: string; badge: string; icon: string; rule: string }> = {
   sky: {
     card: "border-sky-200/80 bg-sky-50/70 dark:border-sky-400/20 dark:bg-sky-400/[0.08]",
     badge: "border-sky-200 bg-sky-100/80 text-sky-800 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
     icon: "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
-    glow: "bg-sky-200/60 dark:bg-sky-500/15",
     rule: "from-sky-300 via-cyan-200 to-transparent dark:from-sky-500/50 dark:via-cyan-400/30",
   },
   mint: {
     card: "border-emerald-200/80 bg-emerald-50/70 dark:border-emerald-400/20 dark:bg-emerald-400/[0.08]",
     badge: "border-emerald-200 bg-emerald-100/80 text-emerald-800 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200",
     icon: "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200",
-    glow: "bg-emerald-200/60 dark:bg-emerald-500/15",
     rule: "from-emerald-300 via-teal-200 to-transparent dark:from-emerald-500/50 dark:via-teal-400/30",
   },
   amber: {
     card: "border-amber-200/80 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-400/[0.08]",
     badge: "border-amber-200 bg-amber-100/80 text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
     icon: "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
-    glow: "bg-amber-200/60 dark:bg-amber-500/15",
     rule: "from-amber-300 via-orange-200 to-transparent dark:from-amber-500/50 dark:via-orange-400/30",
   },
   rose: {
     card: "border-rose-200/80 bg-rose-50/70 dark:border-rose-400/20 dark:bg-rose-400/[0.08]",
     badge: "border-rose-200 bg-rose-100/80 text-rose-800 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200",
     icon: "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200",
-    glow: "bg-rose-200/60 dark:bg-rose-500/15",
     rule: "from-rose-300 via-pink-200 to-transparent dark:from-rose-500/50 dark:via-pink-400/30",
   },
   violet: {
     card: "border-violet-200/80 bg-violet-50/70 dark:border-violet-400/20 dark:bg-violet-400/[0.08]",
     badge: "border-violet-200 bg-violet-100/80 text-violet-800 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200",
     icon: "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200",
-    glow: "bg-violet-200/60 dark:bg-violet-500/15",
     rule: "from-violet-300 via-fuchsia-200 to-transparent dark:from-violet-500/50 dark:via-fuchsia-400/30",
   },
   cyan: {
     card: "border-cyan-200/80 bg-cyan-50/70 dark:border-cyan-400/20 dark:bg-cyan-400/[0.08]",
     badge: "border-cyan-200 bg-cyan-100/80 text-cyan-800 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-200",
     icon: "border-cyan-200 bg-cyan-100 text-cyan-700 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-200",
-    glow: "bg-cyan-200/60 dark:bg-cyan-500/15",
     rule: "from-cyan-300 via-sky-200 to-transparent dark:from-cyan-500/50 dark:via-sky-400/30",
   },
   lime: {
     card: "border-lime-200/80 bg-lime-50/70 dark:border-lime-400/20 dark:bg-lime-400/[0.08]",
     badge: "border-lime-200 bg-lime-100/80 text-lime-800 dark:border-lime-400/25 dark:bg-lime-400/10 dark:text-lime-200",
     icon: "border-lime-200 bg-lime-100 text-lime-700 dark:border-lime-400/25 dark:bg-lime-400/10 dark:text-lime-200",
-    glow: "bg-lime-200/60 dark:bg-lime-500/15",
     rule: "from-lime-300 via-emerald-200 to-transparent dark:from-lime-500/50 dark:via-emerald-400/30",
   },
 };
 
 const quickLinks = [
-  {
-    title: "Create",
-    copy: "Configure token basics, upload a logo, and deploy on Base Sepolia.",
-    icon: <IconRocket className="h-5 w-5" />,
-    to: "/create",
-    tone: "sky" as Tone,
-  },
-  {
-    title: "Manage",
-    copy: "Tune fees, limits, trading controls, airdrops and ownership.",
-    icon: <IconGauge className="h-5 w-5" />,
-    to: "/dashboard",
-    tone: "mint" as Tone,
-  },
-  {
-    title: "Verify",
-    copy: "Copy the ready command and publish source on BaseScan faster.",
-    icon: <IconCheck className="h-5 w-5" />,
-    to: "#verify",
-    tone: "amber" as Tone,
-  },
-  {
-    title: "Safety",
-    copy: "Understand owner powers before launch and renounce when ready.",
-    icon: <IconShield className="h-5 w-5" />,
-    to: "#security",
-    tone: "rose" as Tone,
-  },
+  { title: "Create", copy: "Launch a native B20 Asset token on Base mainnet.", icon: <IconRocket className="h-5 w-5" />, to: "/create", tone: "sky" as Tone },
+  { title: "Manage", copy: "Mint, pause, update metadata and manage roles.", icon: <IconGauge className="h-5 w-5" />, to: "/dashboard", tone: "mint" as Tone },
+  { title: "Base docs", copy: "Official launch guide and standard reference.", icon: <IconExternal className="h-5 w-5" />, to: "https://docs.base.org/get-started/launch-b20-token", tone: "amber" as Tone },
+  { title: "Safety", copy: "Understand admin powers before renouncing roles.", icon: <IconShield className="h-5 w-5" />, to: "#security", tone: "rose" as Tone },
 ];
 
 const SECTIONS: Section[] = [
   {
     id: "overview",
     title: "What B20 Is",
-    eyebrow: "Studio Overview",
-    summary: "A no-code launch and operations suite for ERC-20 tokens on Base Sepolia.",
+    eyebrow: "Native Standard",
+    summary: "B20 is Base's native token standard and an ERC-20 superset implemented as chain precompiles.",
     tone: "sky",
     icon: <IconBook className="h-5 w-5" />,
     body: (
       <>
         <P>
-          <b>B20</b> helps you create, test and manage ERC-20 tokens without writing Solidity. You
-          choose the launch settings in the browser, deploy with one wallet transaction, then run
-          the token from the owner dashboard.
+          <b>B20</b> is Base's native token standard. It is an ERC-20 superset, so standard ERC-20 calls such as
+          <Code>transfer</Code>, <Code>transferFrom</Code>, <Code>approve</Code>, <Code>balanceOf</Code> and
+          <Code>allowance</Code> remain compatible with existing ERC-20 tooling.
         </P>
         <P>
-          The contract uses audited OpenZeppelin components, gas-conscious storage, and a verification
-          flow designed for BaseScan. It is built for community-token experiments on <b>Base Sepolia</b>
-          while Base mainnet B20 remains paused.
+          The important difference is implementation. B20 tokens run as Rust precompiles on Base instead of normal EVM
+          smart contracts deployed by users. That is why this app calls the singleton B20 Factory instead of deploying
+          custom Solidity bytecode.
         </P>
-        <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />} title="Solidity B20 studio and Base native B20">
-          Base is also working on a native token standard called B20 for regulated stablecoin and
-          real-world-asset issuers. This app is separate from that standard. It deploys classic
-          Solidity ERC-20 contracts with taxes, anti-whale limits, launch controls and BaseScan verification.
+        <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />} title="Current app behavior">
+          This studio creates B20 Asset variant tokens on Base mainnet chain ID 8453. Legacy custom-token flows are no
+          longer part of the launch path.
         </Callout>
       </>
     ),
   },
   {
-    id: "getting-started",
-    title: "Getting Started",
-    eyebrow: "First Run",
-    summary: "Connect a wallet, switch to Base Sepolia, and use test ETH before deploying.",
+    id: "network",
+    title: "Network And Addresses",
+    eyebrow: "Mainnet",
+    summary: "The production path is Base mainnet with the official B20 precompile addresses.",
     tone: "mint",
     icon: <IconWallet className="h-5 w-5" />,
     body: (
       <>
-        <Ol>
-          <li><b>Connect a wallet</b> from the top-right wallet button.</li>
-          <li><b>Use Base Sepolia.</b> It is the only enabled network right now.</li>
-          <li><b>Fund with test ETH</b> from a Base Sepolia faucet before deploying.</li>
-          <li><b>Deploy small test tokens first</b> so you can rehearse the full launch flow.</li>
-        </Ol>
+        <InfoGrid
+          rows={[
+            ["Network", "Base mainnet"],
+            ["Chain ID", "8453"],
+            ["RPC", "https://mainnet.base.org"],
+            ["Explorer", "https://basescan.org"],
+            ["B20 Factory", B20_FACTORY_ADDRESS],
+            ["Activation Registry", ACTIVATION_REGISTRY_ADDRESS],
+            ["Policy Registry", POLICY_REGISTRY_ADDRESS],
+          ]}
+        />
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Do not send mainnet funds to this app while mainnet support is disabled.
+          B20 creation reverts if the requested variant is not activated in the Activation Registry. The app targets
+          mainnet B20 now that the mainnet path is enabled.
         </Callout>
       </>
     ),
   },
   {
     id: "create",
-    title: "Create A Token",
-    eyebrow: "Launch Setup",
-    summary: "Set supply, token identity, logo, taxes, minting and launch limits in one flow.",
+    title: "Create Flow",
+    eyebrow: "Factory Call",
+    summary: "The app calls createB20 with Asset params and bootstrap initCalls.",
     tone: "violet",
     icon: <IconSparkles className="h-5 w-5" />,
     body: (
       <>
         <P>
-          The <Link to="/create" className="font-medium text-fg underline decoration-border underline-offset-4">Create</Link>{" "}
-          page separates required fields from advanced launch controls, so you can keep a simple token
-          simple or add stricter launch mechanics when needed.
+          The factory method is <Code>createB20(uint8 variant, bytes32 salt, bytes params, bytes[] initCalls)</Code>.
+          This app uses variant <Code>ASSET = 0</Code> and params version <Code>1</Code>.
         </P>
-        <FeatureGrid
-          items={[
-            ["Basics", "Name, symbol, total supply, decimals and an optional uploaded logo."],
-            ["Ownership", "The full initial supply is minted to your connected wallet."],
-            ["Advanced", "Buy tax, sell tax, burn, mint caps, max transaction and max wallet."],
-            ["Later controls", "Blacklist, whitelist, pause, airdrops and ownership changes stay in the dashboard."],
+        <InfoGrid
+          rows={[
+            ["Asset params", "version, name, symbol, initialAdmin, decimals"],
+            ["Decimals", "Asset decimals are immutable and must be 6 to 18"],
+            ["Salt", "Randomized per launch for deterministic B20 address derivation"],
+            ["Initial admin", "Connected wallet receives DEFAULT_ADMIN_ROLE"],
+            ["Supply cap", `Maximum allowed cap is ${MAX_UINT128.toString()}`],
+            ["Initial supply", "Minted during bootstrap after cap and roles are configured"],
           ]}
         />
-      </>
-    ),
-  },
-  {
-    id: "tax",
-    title: "Buy, Sell And Burn Fees",
-    eyebrow: "Fee Model",
-    summary: "Use fees carefully, keep them transparent, and rely on the 25% on-chain ceiling.",
-    tone: "amber",
-    icon: <IconFlame className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          <b>Buy tax</b> applies when tokens move from a registered DEX pair. <b>Sell tax</b> applies
-          when tokens move into that pair. Collected fees go to the tax collector wallet. <b>Burn</b>{" "}
-          destroys a slice of transfers and reduces total supply.
-        </P>
-        <Callout tone="positive" icon={<IconShield className="h-4 w-4" />} title="Hard fee ceiling">
-          The contract rejects any trade configuration above 25% total tax. The owner cannot set a
-          malicious 99% honeypot fee.
+        <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
+          Factory initCalls run during token creation. They can configure cap, roles, metadata and the bootstrap mint
+          atomically, while B20 invariants such as supply cap still apply.
         </Callout>
-        <P>
-          On the dashboard, changed fee sliders are saved through one clear save action. After the
-          transaction receipts confirm, the app refetches the current on-chain values.
-        </P>
       </>
     ),
   },
   {
-    id: "pairs",
-    title: "DEX Pairs",
-    eyebrow: "Trade Detection",
-    summary: "Register pool addresses so the contract can distinguish buys, sells and normal transfers.",
-    tone: "cyan",
-    icon: <IconLink className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          ERC-20 transfers do not include the word buy or sell. The contract detects trades by checking
-          whether the sender or receiver is a registered liquidity pair.
-        </P>
-        <Ol>
-          <li>Deploy your token.</li>
-          <li>Add liquidity on a Base DEX such as Aerodrome or Uniswap.</li>
-          <li>Copy the created pool or pair address.</li>
-          <li>Paste it into the dashboard DEX pairs panel and mark it as active.</li>
-        </Ol>
-        <P>
-          Before a pair is registered, the token behaves like a plain untaxed ERC-20.
-        </P>
-      </>
-    ),
-  },
-  {
-    id: "minting",
-    title: "Minting And Supply Cap",
-    eyebrow: "Supply Control",
-    summary: "Mint only if enabled, respect the hard cap, and disable minting forever when ready.",
-    tone: "lime",
-    icon: <IconCoins className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          If minting is enabled, the dashboard can mint new tokens to any address. When a hard cap is
-          set, total supply can never move above that cap.
-        </P>
-        <P>
-          <b>Disable minting forever</b> permanently locks future supply. It is irreversible, but it is
-          also a strong trust signal for holders.
-        </P>
-        <P>
-          Token holders can still burn their own balance through standard ERC20Burnable behavior.
-        </P>
-      </>
-    ),
-  },
-  {
-    id: "limits",
-    title: "Anti-Whale Limits",
-    eyebrow: "Launch Protection",
-    summary: "Use max transaction and max wallet to make early distribution harder to abuse.",
+    id: "roles",
+    title: "Roles",
+    eyebrow: "Access Control",
+    summary: "B20 uses fixed roles, not a single owner model.",
     tone: "rose",
-    icon: <IconTrendUp className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          <b>Max transaction</b> caps how much can move in a single transfer. <b>Max wallet</b> caps
-          how much one address can hold. Together they reduce early launch concentration.
-        </P>
-        <P>
-          Owner and tax wallets are excluded automatically. Registered pools are exempt from the max
-          wallet check, so liquidity can be larger than holder limits.
-        </P>
-      </>
-    ),
-  },
-  {
-    id: "trading",
-    title: "Trading Gate And Pause",
-    eyebrow: "Launch State",
-    summary: "Keep trading closed while preparing liquidity, then open it permanently when ready.",
-    tone: "sky",
     icon: <IconLock className="h-5 w-5" />,
     body: (
       <>
-        <P>
-          New tokens start with trading closed. This gives the owner time to add liquidity, register
-          pairs, and double-check configuration before public transfers begin.
-        </P>
-        <P>
-          <b>Enable trading</b> opens the token permanently. <b>Pause</b> is a temporary emergency
-          brake for non-exempt transfers.
-        </P>
+        <InfoGrid
+          rows={[
+            ["DEFAULT_ADMIN_ROLE", "Grants and revokes roles, updates supply cap and policies"],
+            ["MINT_ROLE", "Can mint and mintWithMemo"],
+            ["BURN_ROLE", "Can burn and burnWithMemo from its own balance"],
+            ["BURN_BLOCKED_ROLE", "Can burnBlocked from policy-blocked accounts"],
+            ["PAUSE_ROLE", "Can pause selected features"],
+            ["UNPAUSE_ROLE", "Can unpause selected features"],
+            ["METADATA_ROLE", "Can update name, symbol, contractURI and Asset extra metadata"],
+            ["OPERATOR_ROLE", "Asset role for multiplier updates and announcements"],
+          ]}
+        />
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />} title="Last admin rule">
+          The final DEFAULT_ADMIN_ROLE holder cannot be removed with normal revoke or renounceRole. B20 uses
+          <Code>renounceLastAdmin()</Code> for the permanent admin-less transition.
+        </Callout>
       </>
     ),
   },
   {
-    id: "access",
-    title: "Blacklist And Whitelist",
-    eyebrow: "Access Controls",
-    summary: "Block malicious wallets or run a temporary allowlisted launch phase.",
-    tone: "violet",
+    id: "dashboard",
+    title: "Dashboard Controls",
+    eyebrow: "Operate",
+    summary: "Manage native B20 behavior without legacy custom-token controls.",
+    tone: "cyan",
+    icon: <IconGauge className="h-5 w-5" />,
+    body: (
+      <>
+        <Ol>
+          <li><b>Mint and batch mint.</b> Requires MINT_ROLE and cannot exceed the configured supply cap.</li>
+          <li><b>Supply cap.</b> Requires DEFAULT_ADMIN_ROLE. It can move up or down, but not below totalSupply.</li>
+          <li><b>Pause features.</b> Transfers, minting and burning are independently pausable.</li>
+          <li><b>Metadata.</b> Update name, symbol, contractURI and Asset extraMetadata such as logoURI.</li>
+          <li><b>Roles.</b> Grant, revoke and renounce built-in roles from the dashboard.</li>
+          <li><b>Memo transfer.</b> Send normal token transfers with a bytes32 memo.</li>
+        </Ol>
+        <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
+          The dashboard no longer includes trade fees, DEX-pair registration, custom denylist controls, or
+          Solidity source verification. Those were from the old custom contract path and are not native B20 features.
+        </Callout>
+      </>
+    ),
+  },
+  {
+    id: "policy",
+    title: "Policy Registry",
+    eyebrow: "Compliance Surface",
+    summary: "B20 supports policy-gated transfers and mint receivers through the Policy Registry.",
+    tone: "amber",
     icon: <IconUsers className="h-5 w-5" />,
     body: (
       <>
         <P>
-          <b>Blacklist</b> prevents a wallet from sending or receiving tokens. <b>Whitelist-only mode</b>{" "}
-          limits transfers to approved wallets while the mode is active.
+          The Policy Registry manages allowlist and blocklist policies. B20 tokens reference policies by numeric ID for
+          transfer sender, transfer receiver, transfer executor and mint receiver scopes.
+        </P>
+        <P>
+          New tokens default to the built-in always-allow policy unless a policy is intentionally configured. This app
+          currently creates open Asset tokens by default and exposes role, pause, supply and metadata controls first.
         </P>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          These are centralized owner powers. Use them transparently and renounce ownership when you
-          want to prove they can no longer be used.
+          Policy IDs should be validated before assignment. Binding to the wrong ID can make a policy stricter or more
+          open than intended.
         </Callout>
       </>
     ),
   },
   {
-    id: "ownership",
-    title: "Ownership",
-    eyebrow: "Control Transfer",
-    summary: "Transfer ownership in two steps, or renounce when the token is ready to be immutable.",
-    tone: "mint",
-    icon: <IconShield className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          Ownership transfer is a two-step process. The current owner nominates a new owner, and the
-          new owner must accept control from their own wallet.
-        </P>
-        <P>
-          <b>Renounce ownership</b> sets the owner to the zero address forever. Tax, minting, blacklist,
-          pause and other owner actions become frozen.
-        </P>
-      </>
-    ),
-  },
-  {
-    id: "airdrop",
-    title: "Batch Airdrop",
-    eyebrow: "Distribution",
-    summary: "Send tokens to many wallets in one transaction after the dashboard validates the list.",
-    tone: "cyan",
-    icon: <IconSend className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          Paste one recipient per line as <Code>address, amount</Code>. The panel totals the list,
-          checks it against your balance, and sends the whole batch in one transaction.
-        </P>
-        <P>
-          This is usually cheaper and easier to audit than sending many individual transfers.
-        </P>
-      </>
-    ),
-  },
-  {
-    id: "rescue",
-    title: "Rescue Stuck Funds",
-    eyebrow: "Recovery",
-    summary: "Recover ETH or foreign ERC-20 tokens that were sent to the contract by mistake.",
+    id: "publish",
+    title: "BaseScan Publish",
+    eyebrow: "Verification",
+    summary: "Native B20 tokens do not require user Solidity source verification.",
     tone: "lime",
-    icon: <IconLifebuoy className="h-5 w-5" />,
+    icon: <IconExternal className="h-5 w-5" />,
     body: (
       <>
         <P>
-          The dashboard can rescue ETH or unrelated ERC-20 tokens that people accidentally send
-          directly to the token contract.
+          A classic contract deployment uploads bytecode from the user wallet and then verifies Solidity source on an
+          explorer. Native B20 is different. The user calls the B20 Factory precompile, and the token is created by
+          Base's native implementation.
         </P>
         <P>
-          Your own token cannot be rescued through this panel by design, so the owner cannot drain
-          holder balances with the recovery function.
-        </P>
-      </>
-    ),
-  },
-  {
-    id: "verify",
-    title: "Verify On BaseScan",
-    eyebrow: "Source Publishing",
-    summary: "Publish contract source from the dashboard with one button.",
-    tone: "amber",
-    icon: <IconCheck className="h-5 w-5" />,
-    body: (
-      <>
-        <P>
-          Open your token in the dashboard and press <b>Verify & publish</b>. The app submits
-          the exact compiler input and constructor arguments to BaseScan, then checks the result for you.
-        </P>
-        <P>
-          The verifier uses a server-side <Code>BASESCAN_API_KEY</Code>, so the key never goes to
-          the browser. Once verified, BaseScan shows the source code publicly.
+          For users, the correct publish path is to open the token page on BaseScan and share the token address. The
+          dashboard links directly to the token page and the factory page.
         </P>
       </>
     ),
   },
   {
     id: "security",
-    title: "Security Notes",
-    eyebrow: "Launch Discipline",
-    summary: "The app is non-custodial, but owner powers are real and should be communicated clearly.",
+    title: "Security Checklist",
+    eyebrow: "Before Launch",
+    summary: "Use B20 roles carefully and keep admin powers transparent.",
     tone: "rose",
-    icon: <IconAlert className="h-5 w-5" />,
+    icon: <IconShield className="h-5 w-5" />,
     body: (
       <>
-        <Ul>
-          <li>B20 never holds your private keys, wallet funds or token ownership.</li>
-          <li>Contracts are immutable after deployment, so rehearse on Base Sepolia every time.</li>
-          <li>Owner powers such as tax, blacklist, pause and minting are visible on-chain.</li>
-          <li>This tool and documentation are not financial or legal advice.</li>
-        </Ul>
+        <Ol>
+          <li>Use a wallet you control for initial DEFAULT_ADMIN_ROLE.</li>
+          <li>Grant MINT_ROLE only while minting is required.</li>
+          <li>Keep supply cap at or above planned maximum supply.</li>
+          <li>Grant pause roles only to wallets that should handle emergencies.</li>
+          <li>Set contractURI and logoURI before sharing the token publicly.</li>
+          <li>Renounce the final admin only when no future admin updates are needed.</li>
+        </Ol>
+        <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
+          This app helps enforce B20 input constraints and uses the native standard. It is not a legal, financial or
+          formal audit guarantee.
+        </Callout>
       </>
     ),
   },
@@ -427,107 +292,83 @@ export function Docs() {
   const [active, setActive] = useState(SECTIONS[0].id);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActive(entry.target.id);
-        }
-      },
-      { rootMargin: "-28% 0px -62% 0px", threshold: 0 }
-    );
-
-    SECTIONS.forEach((section) => {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
+    const onScroll = () => {
+      let current = SECTIONS[0].id;
+      for (const section of SECTIONS) {
+        const el = document.getElementById(section.id);
+        if (el && el.getBoundingClientRect().top < 180) current = section.id;
+      }
+      setActive(current);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
-      <header className="relative overflow-hidden rounded-2xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8 lg:px-10">
-        <div className="absolute inset-0 grid-dots opacity-60" />
-        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-sky-200/60 blur-3xl dark:bg-sky-500/15" />
-        <div className="absolute -bottom-24 left-12 h-60 w-60 rounded-full bg-emerald-200/50 blur-3xl dark:bg-emerald-500/10" />
-        <div className="relative max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200">
-            <IconSparkles className="h-3.5 w-3.5" />
-            B20 Documentation
-          </span>
-          <h1 className="mt-5 font-display text-5xl leading-[0.98] text-fg sm:text-6xl lg:text-7xl">
-            Launch with clarity. Manage with confidence.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-            A professional guide to creating, verifying and operating ERC-20 tokens on Base Sepolia
-            with B20.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-2">
-            {["Base Sepolia only", "25% tax ceiling", "BaseScan ready", "Non-custodial"].map((item) => (
-              <span key={item} className="rounded-full border border-border bg-bg/80 px-3 py-1.5 text-xs font-medium text-muted">
-                {item}
-              </span>
-            ))}
+    <div className="relative">
+      <section className="relative overflow-hidden border-b border-border bg-surface/50">
+        <div className="pointer-events-none absolute inset-0 grid-dots opacity-70" />
+        <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
+              <IconSparkles className="h-3.5 w-3.5" />
+              Base mainnet B20 documentation
+            </span>
+            <h1 className="mt-5 font-display text-5xl font-semibold leading-[0.98] tracking-tight sm:text-7xl">
+              Native B20, explained clearly.
+            </h1>
+            <p className="mt-6 max-w-2xl text-[15px] leading-7 text-muted sm:text-lg">
+              A practical guide for creating and managing Base-native B20 Asset tokens with the official Factory precompile.
+            </p>
+          </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {quickLinks.map((item) => {
+              const tone = toneStyles[item.tone];
+              const external = item.to.startsWith("http");
+              const content = (
+                <div className={cn("group rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-card", tone.card)}>
+                  <span className={cn("grid h-10 w-10 place-items-center rounded-xl border", tone.icon)}>{item.icon}</span>
+                  <h3 className="mt-4 text-sm font-semibold">{item.title}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{item.copy}</p>
+                </div>
+              );
+              return external ? <a key={item.title} href={item.to} target="_blank" rel="noreferrer">{content}</a> : <Link key={item.title} to={item.to}>{content}</Link>;
+            })}
           </div>
         </div>
-      </header>
+      </section>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {quickLinks.map((item) => (
-          <QuickLink key={item.title} {...item} />
-        ))}
-      </div>
-
-      <div className="mt-10 grid gap-8 lg:grid-cols-[260px_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[240px_1fr]">
         <aside className="hidden lg:block">
-          <nav className="sticky top-24 rounded-2xl border border-border bg-surface p-3 shadow-card">
-            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">
-              Chapters
-            </p>
-            <div className="space-y-1">
-              {SECTIONS.map((section) => {
-                const tone = toneStyles[section.tone];
-                return (
-                  <a
-                    key={section.id}
-                    href={`#${section.id}`}
-                    className={cn(
-                      "group flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] transition",
-                      active === section.id ? "bg-elevated text-fg" : "text-muted hover:bg-elevated/70 hover:text-fg"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full transition",
-                        active === section.id ? tone.glow : "bg-border group-hover:bg-ring"
-                      )}
-                    />
-                    <span className="truncate">{section.title}</span>
-                  </a>
-                );
-              })}
-            </div>
+          <nav className="sticky top-24 space-y-1">
+            {SECTIONS.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className={cn(
+                  "block rounded-xl px-3 py-2 text-sm transition",
+                  active === section.id ? "bg-elevated text-fg" : "text-muted hover:bg-elevated/70 hover:text-fg"
+                )}
+              >
+                {section.title}
+              </a>
+            ))}
           </nav>
         </aside>
 
-        <main className="min-w-0 space-y-6">
-          {SECTIONS.map((section) => (
-            <DocSection key={section.id} section={section} />
-          ))}
-
-          <section className="rounded-2xl border border-border bg-fg p-6 text-bg shadow-card sm:flex sm:items-center sm:justify-between sm:gap-6">
-            <div>
-              <p className="font-display text-3xl leading-tight">Ready to test your launch?</p>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-bg/75">
-                Create on Base Sepolia, verify the contract, then tune the dashboard before any real launch plan.
-              </p>
+        <main className="space-y-5">
+          {SECTIONS.map((section) => <DocSection key={section.id} section={section} />)}
+          <section className="rounded-2xl border border-border bg-surface px-5 py-5">
+            <h2 className="text-sm font-semibold">Official references</h2>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <a href="https://docs.base.org/get-started/launch-b20-token" target="_blank" rel="noreferrer" className="rounded-xl border border-border bg-elevated px-4 py-3 text-sm hover:border-ring">
+                Launch a B20 Token <IconExternal className="ml-1 inline h-3.5 w-3.5" />
+              </a>
+              <a href="https://docs.base.org/base-chain/specs/upgrades/beryl/b20" target="_blank" rel="noreferrer" className="rounded-xl border border-border bg-elevated px-4 py-3 text-sm hover:border-ring">
+                B20 Native Token Standard <IconExternal className="ml-1 inline h-3.5 w-3.5" />
+              </a>
             </div>
-            <Link
-              to="/create"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-bg px-5 py-3 text-sm font-semibold text-fg transition hover:opacity-90 sm:mt-0"
-            >
-              Create a token <IconArrowRight className="h-4 w-4" />
-            </Link>
           </section>
         </main>
       </div>
@@ -535,95 +376,47 @@ export function Docs() {
   );
 }
 
-function QuickLink({
-  title,
-  copy,
-  icon,
-  to,
-  tone,
-}: {
-  title: string;
-  copy: string;
-  icon: ReactNode;
-  to: string;
-  tone: Tone;
-}) {
-  const styles = toneStyles[tone];
-  const className = cn(
-    "group relative overflow-hidden rounded-2xl border p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft",
-    styles.card
-  );
-  const content = (
-    <>
-      <span className={cn("grid h-10 w-10 place-items-center rounded-xl border", styles.icon)}>{icon}</span>
-      <h2 className="mt-4 text-base font-semibold text-fg">{title}</h2>
-      <p className="mt-1 text-sm leading-6 text-muted">{copy}</p>
-      <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-fg">
-        Open <IconArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-      </span>
-    </>
-  );
-
-  if (to.startsWith("#")) {
-    return <a href={to} className={className}>{content}</a>;
-  }
-
-  return <Link to={to} className={className}>{content}</Link>;
-}
-
 function DocSection({ section }: { section: Section }) {
-  const styles = toneStyles[section.tone];
-
+  const tone = toneStyles[section.tone];
   return (
-    <section
-      id={section.id}
-      className={cn("scroll-mt-24 overflow-hidden rounded-2xl border bg-surface shadow-card", styles.card)}
-    >
-      <div className={cn("h-1 w-full bg-gradient-to-r", styles.rule)} />
-      <div className="p-5 sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl border", styles.icon)}>
-            {section.icon}
+    <section id={section.id} className={cn("scroll-mt-24 rounded-2xl border p-5 shadow-card sm:p-6", tone.card)}>
+      <div className="mb-5 flex items-start gap-4">
+        <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl border", tone.icon)}>{section.icon}</span>
+        <div>
+          <span className={cn("inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", tone.badge)}>
+            {section.eyebrow}
           </span>
-          <div className="min-w-0 flex-1">
-            <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", styles.badge)}>
-              {section.eyebrow}
-            </span>
-            <h2 className="mt-3 font-display text-3xl leading-tight text-fg sm:text-4xl">{section.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted sm:text-[15px]">{section.summary}</p>
-          </div>
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight">{section.title}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{section.summary}</p>
         </div>
-        <div className="mt-6 space-y-4 text-[15px] leading-7 text-muted">{section.body}</div>
       </div>
+      <div className={cn("mb-5 h-px bg-gradient-to-r", tone.rule)} />
+      <div className="space-y-4 text-sm leading-7 text-muted">{section.body}</div>
     </section>
   );
 }
 
-function FeatureGrid({ items }: { items: Array<[string, string]> }) {
+function P({ children }: { children: ReactNode }) {
+  return <p className="text-sm leading-7 text-muted">{children}</p>;
+}
+
+function Ol({ children }: { children: ReactNode }) {
+  return <ol className="list-decimal space-y-2 pl-5 text-sm leading-7 text-muted">{children}</ol>;
+}
+
+function Code({ children }: { children: ReactNode }) {
+  return <code className="mx-1 rounded-md border border-border bg-elevated px-1.5 py-0.5 font-mono text-[12px] text-fg">{children}</code>;
+}
+
+function InfoGrid({ rows }: { rows: Array<[string, string]> }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {items.map(([title, copy]) => (
-        <div key={title} className="rounded-xl border border-border bg-bg/70 p-4">
-          <p className="font-semibold text-fg">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-muted">{copy}</p>
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface/75">
+      {rows.map(([label, value]) => (
+        <div key={label} className="grid gap-1 border-b border-border px-4 py-3 last:border-b-0 sm:grid-cols-[190px_1fr]">
+          <div className="text-xs font-semibold uppercase tracking-wide text-faint">{label}</div>
+          <div className="break-all font-mono text-xs text-fg sm:text-sm">{value}</div>
         </div>
       ))}
     </div>
   );
-}
-
-function P({ children }: { children: ReactNode }) {
-  return <p>{children}</p>;
-}
-
-function Ul({ children }: { children: ReactNode }) {
-  return <ul className="list-disc space-y-2 pl-5 marker:text-faint">{children}</ul>;
-}
-
-function Ol({ children }: { children: ReactNode }) {
-  return <ol className="list-decimal space-y-2 pl-5 marker:text-faint">{children}</ol>;
-}
-
-function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded-lg border border-border bg-bg px-1.5 py-0.5 font-mono text-[12px] text-fg">{children}</code>;
 }

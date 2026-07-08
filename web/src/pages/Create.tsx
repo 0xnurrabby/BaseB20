@@ -1,9 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAccount, useChainId, useDeployContract, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
-import { B20_ABI, B20_BYTECODE, buildVerifyArgs, serializeTokenConfig, verifyCommand, verifyReadyCommand, type TokenConfigInput } from "../lib/contract";
+import { parseEventLogs, parseUnits } from "viem";
+import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import {
+  B20_CREATE_PARAMS_VERSION,
+  B20_FACTORY_ABI,
+  B20_FACTORY_ADDRESS,
+  B20_VARIANT_ASSET,
+  MAX_ASSET_DECIMALS,
+  MAX_UINT128,
+  MIN_ASSET_DECIMALS,
+  buildB20InitCalls,
+  encodeAssetCreateParams,
+  randomSalt,
+  type B20CreateConfig,
+} from "../lib/contract";
 import { DEFAULT_CHAIN_ID, chainName, explorerUrl, getTargetChainId, isSupportedChain } from "../lib/wagmi";
-import { commafy, isAddressLike, parseWholeNumber } from "../lib/format";
+import { commafy } from "../lib/format";
 import { saveToken } from "../lib/storage";
 import { trackEvent } from "../lib/analytics";
 import {
@@ -16,7 +29,6 @@ import {
   Input,
   Modal,
   SectionCard,
-  Slider,
   Switch,
   cn,
 } from "../components/ui";
@@ -25,15 +37,11 @@ import {
   IconCheck,
   IconCoins,
   IconExternal,
-  IconFlame,
   IconGauge,
   IconRocket,
   IconSettings,
   IconShield,
   IconSparkles,
-  IconTrendDown,
-  IconTrendUp,
-  IconUsers,
   IconWallet,
 } from "../components/icons";
 import { WalletConnect } from "../components/WalletConnect";
@@ -44,156 +52,121 @@ interface FormState {
   symbol: string;
   supply: string;
   decimals: string;
+  capEnabled: boolean;
+  supplyCap: string;
+  contractURI: string;
   logoURI: string;
-  // advanced
-  taxEnabled: boolean;
-  buyTax: number; // percent
-  sellTax: number;
-  burnTax: number;
-  taxWallet: string;
-  mintable: boolean;
-  capped: boolean;
-  maxSupply: string;
-  limitsEnabled: boolean;
-  maxTx: string; // percent of supply
-  maxWallet: string; // percent of supply
+  grantMinter: boolean;
+  grantPauser: boolean;
+  grantMetadata: boolean;
+  grantOperator: boolean;
 }
 
 const DEFAULTS: FormState = {
   name: "",
   symbol: "",
-  supply: "1000000000",
+  supply: "1000000",
   decimals: "18",
+  capEnabled: true,
+  supplyCap: "1000000",
+  contractURI: "",
   logoURI: "",
-  taxEnabled: false,
-  buyTax: 0,
-  sellTax: 0,
-  burnTax: 0,
-  taxWallet: "",
-  mintable: false,
-  capped: false,
-  maxSupply: "",
-  limitsEnabled: false,
-  maxTx: "2",
-  maxWallet: "2",
+  grantMinter: true,
+  grantPauser: true,
+  grantMetadata: true,
+  grantOperator: false,
 };
 
-const MAX_UINT256 = (1n << 256n) - 1n;
+interface PendingCreate {
+  config: B20CreateConfig;
+  salt: `0x${string}`;
+}
 
-const createPanel = {
+const panel = {
   basics: {
     card: "border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
     icon: "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200",
   },
-  tax: {
-    card: "border-amber-200/80 bg-amber-50/55 dark:border-amber-400/20 dark:bg-amber-400/[0.07]",
-    icon: "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
-  },
-  mint: {
+  standard: {
     card: "border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]",
     icon: "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200",
-  },
-  limits: {
-    card: "border-violet-200/80 bg-violet-50/55 dark:border-violet-400/20 dark:bg-violet-400/[0.07]",
-    icon: "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-400/25 dark:bg-violet-400/10 dark:text-violet-200",
   },
 };
 
 export function Create() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const [tab, setTab] = useState<"normal" | "advanced">("normal");
+  const targetChainId = getTargetChainId(chainId);
+  const supported = isSupportedChain(chainId);
+  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
+  const { data: receipt, isLoading: isMining } = useWaitForTransactionReceipt({ hash, chainId: targetChainId });
+
   const [f, setF] = useState<FormState>(DEFAULTS);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [pending, setPending] = useState<PendingCreate | null>(null);
+  const [networkError, setNetworkError] = useState("");
+  const [savedHash, setSavedHash] = useState("");
+
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setF((s) => ({ ...s, [k]: v }));
     setTouched((t) => (t[k as string] ? t : { ...t, [k as string]: true }));
   };
   const err = (key: string, message?: string) => (touched[key] ? message : undefined);
 
-  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
-  const { deployContract, data: hash, isPending, error, reset } = useDeployContract();
-  const targetChainId = getTargetChainId(chainId);
-  const { data: receipt, isLoading: isMining } = useWaitForTransactionReceipt({ hash, chainId: targetChainId });
-  const [deployedCfg, setDeployedCfg] = useState<TokenConfigInput | null>(null);
-  const [networkError, setNetworkError] = useState("");
-
-  const supported = isSupportedChain(chainId);
-
-  // ---- validation ------------------------------------------------------
-  const decimalsText = f.decimals.trim();
-  const decimalsNum = decimalsText === "" ? NaN : Number(decimalsText);
-  const decimalsOk = Number.isInteger(decimalsNum) && decimalsNum >= 0 && decimalsNum <= 18;
-  const supplyBig = parseWholeNumber(f.supply);
-  const maxSupplyBig = parseWholeNumber(f.maxSupply);
-  const maxWholeSupply = decimalsOk ? MAX_UINT256 / 10n ** BigInt(decimalsNum) : null;
+  const decimals = Number(f.decimals);
+  const decimalsOk = Number.isInteger(decimals) && decimals >= MIN_ASSET_DECIMALS && decimals <= MAX_ASSET_DECIMALS;
+  const supplyRaw = useMemo(() => parseTokenAmount(f.supply, decimalsOk ? decimals : 18), [f.supply, decimals, decimalsOk]);
+  const capRaw = useMemo(
+    () => (f.capEnabled ? parseTokenAmount(f.supplyCap, decimalsOk ? decimals : 18) : MAX_UINT128),
+    [f.capEnabled, f.supplyCap, decimals, decimalsOk]
+  );
 
   const errors = useMemo(() => {
     const e: Partial<Record<string, string>> = {};
     if (!f.name.trim()) e.name = "Name is required";
     if (!f.symbol.trim()) e.symbol = "Symbol is required";
     else if (f.symbol.trim().length > 11) e.symbol = "Keep the symbol at 11 characters or less";
-    if (supplyBig === null || supplyBig <= 0n) e.supply = "Enter a whole supply greater than 0";
-    else if (maxWholeSupply && supplyBig > maxWholeSupply) e.supply = "Supply is too large for this decimal setting";
-    if (!Number.isInteger(decimalsNum) || decimalsNum < 0 || decimalsNum > 18) e.decimals = "0-18";
-    if (f.capped) {
-      if (maxSupplyBig === null || maxSupplyBig <= 0n) e.maxSupply = "Enter a whole max supply";
-      else if (supplyBig !== null && maxSupplyBig < supplyBig) e.maxSupply = "Max supply must be at least initial supply";
-      else if (maxWholeSupply && maxSupplyBig > maxWholeSupply) e.maxSupply = "Max supply is too large for this decimal setting";
+    if (!decimalsOk) e.decimals = "B20 Asset decimals must be 6-18";
+    if (supplyRaw === null || supplyRaw <= 0n) e.supply = "Enter an initial supply greater than 0";
+    else if (supplyRaw > MAX_UINT128) e.supply = "Initial supply cannot exceed uint128 max";
+    if (f.capEnabled) {
+      if (capRaw === null || capRaw <= 0n) e.supplyCap = "Enter a supply cap";
+      else if (supplyRaw !== null && capRaw < supplyRaw) e.supplyCap = "Supply cap must be at least initial supply";
+      else if (capRaw > MAX_UINT128) e.supplyCap = "B20 supply cap cannot exceed uint128 max";
     }
-    if (f.taxEnabled) {
-      if (f.buyTax + f.burnTax > 25) e.buyTax = "Buy + burn tax must be at most 25%";
-      if (f.sellTax + f.burnTax > 25) e.sellTax = "Sell + burn tax must be at most 25%";
-      if (f.taxWallet && !isAddressLike(f.taxWallet)) e.taxWallet = "Not a valid address";
-    }
+    if (f.contractURI && !/^(https?|ipfs):\/\//.test(f.contractURI)) e.contractURI = "Use an https:// or ipfs:// URI";
     if (f.logoURI && !/^(https?|ipfs):\/\//.test(f.logoURI)) e.logoURI = "Use an https:// or ipfs:// URL";
     return e;
-  }, [f, supplyBig, decimalsNum, maxSupplyBig, maxWholeSupply]);
+  }, [f, decimalsOk, supplyRaw, capRaw]);
 
   const hasErrors = Object.keys(errors).length > 0;
 
-  // ---- build config ----------------------------------------------------
-  function buildConfig(): TokenConfigInput | null {
-    if (!address) return null;
-    if (!supplyBig || supplyBig <= 0n) return null;
-    const supply = supplyBig;
-    const cap = f.capped && maxSupplyBig ? maxSupplyBig : 0n;
-    const maxTxBps = Math.max(0, Math.round(Number(f.maxTx) * 100));
-    const maxWalletBps = Math.max(0, Math.round(Number(f.maxWallet) * 100));
-    const maxTxTokens =
-      f.limitsEnabled && maxTxBps > 0
-        ? maxBigInt(1n, (supply * BigInt(maxTxBps)) / 10_000n)
-        : 0n;
-    const maxWalletTokens =
-      f.limitsEnabled && maxWalletBps > 0
-        ? maxBigInt(1n, (supply * BigInt(maxWalletBps)) / 10_000n)
-        : 0n;
+  function buildConfig(): B20CreateConfig | null {
+    if (!address || !decimalsOk || !supplyRaw || supplyRaw <= 0n || capRaw === null) return null;
     return {
-      name_: f.name.trim(),
-      symbol_: f.symbol.trim().toUpperCase(),
-      decimals_: decimalsNum,
-      initialSupply: supply,
-      cap,
-      owner_: address,
-      taxWallet_: (f.taxEnabled && isAddressLike(f.taxWallet) ? f.taxWallet : address) as `0x${string}`,
-      buyTaxBps_: f.taxEnabled ? Math.round(f.buyTax * 100) : 0,
-      sellTaxBps_: f.taxEnabled ? Math.round(f.sellTax * 100) : 0,
-      burnTaxBps_: f.taxEnabled ? Math.round(f.burnTax * 100) : 0,
-      mintable: f.mintable,
-      maxTxTokens,
-      maxWalletTokens,
-      logoURI_: f.logoURI.trim(),
+      name: f.name.trim(),
+      symbol: f.symbol.trim().toUpperCase(),
+      decimals,
+      admin: address,
+      initialSupply: supplyRaw,
+      supplyCap: capRaw,
+      contractURI: f.contractURI.trim(),
+      logoURI: f.logoURI.trim(),
+      grantMinter: f.grantMinter,
+      grantPauser: f.grantPauser,
+      grantMetadata: f.grantMetadata,
+      grantOperator: f.grantOperator,
     };
   }
 
-  async function onDeploy() {
+  async function onCreate() {
     if (hasErrors) {
-      // Reveal every validation message so the user can see what to fix.
       setTouched(Object.keys(DEFAULTS).reduce((a, k) => ({ ...a, [k]: true }), {}));
       return;
     }
-    const cfg = buildConfig();
-    if (!cfg) return;
+    const config = buildConfig();
+    if (!config || !address) return;
     setNetworkError("");
     try {
       if (chainId !== targetChainId) {
@@ -204,66 +177,77 @@ export function Create() {
       setNetworkError(message.includes("User rejected") ? "Network switch rejected." : `Switch to ${chainName(targetChainId)} and try again.`);
       return;
     }
-    setDeployedCfg(cfg);
-    deployContract({ chainId: targetChainId, abi: B20_ABI, bytecode: B20_BYTECODE, args: [cfg as unknown as Record<string, unknown>] });
+
+    const salt = randomSalt(`${address}:${config.symbol}`);
+    const params = encodeAssetCreateParams(config);
+    const initCalls = buildB20InitCalls(config);
+    setPending({ config, salt });
+    setSavedHash("");
+    writeContract({
+      chainId: targetChainId,
+      address: B20_FACTORY_ADDRESS,
+      abi: B20_FACTORY_ABI,
+      functionName: "createB20",
+      args: [B20_VARIANT_ASSET, salt, params, initCalls],
+    });
   }
 
-  // Persist to registry once mined.
-  const deployedAddress = receipt?.contractAddress ?? undefined;
-  const [trackedDeploy, setTrackedDeploy] = useState("");
+  const createdAddress = useMemo(() => {
+    if (!receipt) return undefined;
+    const logs = parseEventLogs({ abi: B20_FACTORY_ABI, logs: receipt.logs, eventName: "B20Created" });
+    return logs[0]?.args.token as `0x${string}` | undefined;
+  }, [receipt]);
+
   useEffect(() => {
-    if (deployedAddress && deployedCfg && address) {
-      saveToken({
-        address: deployedAddress,
-        name: deployedCfg.name_,
-        symbol: deployedCfg.symbol_,
-        chainId: targetChainId,
-        createdAt: Date.now(),
-        deployer: address,
-        txHash: hash,
-        verifyConfig: serializeTokenConfig(deployedCfg),
-      });
-      if (trackedDeploy !== deployedAddress) {
-        setTrackedDeploy(deployedAddress);
-        trackEvent({
-          eventType: "token_created",
-          wallet: address,
-          tokenAddress: deployedAddress,
-          tokenName: deployedCfg.name_,
-          tokenSymbol: deployedCfg.symbol_,
-          chainId: targetChainId,
-          txHash: hash,
-          pagePath: "/create",
-        });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deployedAddress, trackedDeploy]);
+    if (!createdAddress || !pending || !address || savedHash === hash) return;
+    saveToken({
+      address: createdAddress,
+      name: pending.config.name,
+      symbol: pending.config.symbol,
+      chainId: targetChainId,
+      createdAt: Date.now(),
+      deployer: address,
+      txHash: hash,
+      logoURI: pending.config.logoURI,
+    });
+    trackEvent({
+      eventType: "token_created",
+      wallet: address,
+      tokenAddress: createdAddress,
+      tokenName: pending.config.name,
+      tokenSymbol: pending.config.symbol,
+      chainId: targetChainId,
+      txHash: hash,
+      pagePath: "/create",
+    });
+    setSavedHash(hash ?? "");
+  }, [createdAddress, pending, address, targetChainId, hash, savedHash]);
 
   function resetAll() {
     reset();
-    setDeployedCfg(null);
+    setPending(null);
+    setSavedHash("");
   }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
       <header className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8">
         <div className="absolute inset-0 grid-dots opacity-55" />
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-transparent to-violet-50 dark:from-sky-400/[0.08] dark:to-violet-400/[0.08]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-transparent to-emerald-50 dark:from-sky-400/[0.08] dark:to-emerald-400/[0.08]" />
         <div className="relative max-w-3xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
             <IconSparkles className="h-3.5 w-3.5" />
-            Token builder
+            Native B20 factory
           </span>
           <h1 className="mt-5 font-display text-5xl leading-[0.98] text-fg sm:text-6xl">
-            Create a token that feels ready to launch.
+            Launch a native B20 token on Base.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-muted">
-            Configure the essentials, choose optional launch controls, deploy one transaction, and
-            manage everything on <strong className="text-fg">{chainName(chainId)}</strong>.
+            Create a Base-native Asset token through the B20 Factory precompile at{" "}
+            <strong className="text-fg">{chainName(targetChainId)}</strong>. No Solidity contract bytecode is deployed.
           </p>
           <div className="mt-7 flex flex-wrap gap-2">
-            {["Logo upload", "Fee controls", "Mint cap", "Anti-whale limits"].map((item) => (
+            {["B20 Asset", "Factory precompile", "ERC-20 compatible", "Roles and supply cap"].map((item) => (
               <span key={item} className="rounded-full border border-border bg-bg/80 px-3 py-1.5 text-xs font-medium text-muted">
                 {item}
               </span>
@@ -273,184 +257,87 @@ export function Create() {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        {/* ------------------------------- FORM ------------------------------- */}
         <div className="space-y-6">
-          {/* Tabs */}
-          <div className="inline-flex rounded-2xl border border-border bg-surface p-1 shadow-card">
-            {(["normal", "advanced"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition",
-                  tab === t
-                    ? t === "normal"
-                      ? "bg-sky-50 text-sky-800 shadow-soft dark:bg-sky-400/10 dark:text-sky-200"
-                      : "bg-violet-50 text-violet-800 shadow-soft dark:bg-violet-400/10 dark:text-violet-200"
-                    : "text-muted hover:text-fg"
-                )}
-              >
-                {t === "normal" ? <IconCoins className="h-4 w-4" /> : <IconSettings className="h-4 w-4" />}
-                {t === "normal" ? "Basics" : "Advanced"}
-              </button>
-            ))}
-          </div>
+          <SectionCard
+            icon={<IconCoins className="h-5 w-5" />}
+            title="Token identity"
+            desc="Asset variant details are sealed through the native factory."
+            className={panel.basics.card}
+            iconClassName={panel.basics.icon}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Name" error={err("name", errors.name)} hint="e.g. Nurlab Token">
+                <Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Nurlab Token" maxLength={80} />
+              </Field>
+              <Field label="Symbol" error={err("symbol", errors.symbol)} hint="Ticker, e.g. NURL">
+                <Input
+                  value={f.symbol}
+                  onChange={(e) => set("symbol", e.target.value.toUpperCase())}
+                  placeholder="NURL"
+                  maxLength={11}
+                  className="font-mono uppercase"
+                />
+              </Field>
+              <Field label="Initial supply" error={err("supply", errors.supply)} hint={supplyRaw && supplyRaw > 0n ? `${commafy(f.supply)} tokens` : "Minted to your wallet"}>
+                <Input inputMode="decimal" value={f.supply} onChange={(e) => set("supply", cleanDecimal(e.target.value))} placeholder="1000000" />
+              </Field>
+              <Field label="Decimals" error={err("decimals", errors.decimals)} hint="B20 Asset allows 6-18">
+                <Input inputMode="numeric" value={f.decimals} onChange={(e) => set("decimals", e.target.value.replace(/[^\d]/g, ""))} placeholder="18" />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="Stored as Asset extra metadata key logoURI.">
+                  <LogoPicker value={f.logoURI} onChange={(url) => set("logoURI", url)} symbol={f.symbol} />
+                </Field>
+              </div>
+            </div>
+          </SectionCard>
 
-          {tab === "normal" ? (
-            <SectionCard
-              icon={<IconCoins className="h-5 w-5" />}
-              title="Token basics"
-              desc="The essentials every token needs."
-              className={createPanel.basics.card}
-              iconClassName={createPanel.basics.icon}
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Name" error={err("name", errors.name)} hint="e.g. Base Doge">
-                  <Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Base Doge" maxLength={40} />
-                </Field>
-                <Field label="Symbol" error={err("symbol", errors.symbol)} hint="Ticker, e.g. BDOGE">
-                  <Input
-                    value={f.symbol}
-                    onChange={(e) => set("symbol", e.target.value.toUpperCase())}
-                    placeholder="BDOGE"
-                    maxLength={11}
-                    className="font-mono uppercase"
-                  />
-                </Field>
-                <Field label="Total supply" error={err("supply", errors.supply)} hint={supplyBig && supplyBig > 0n ? `${commafy(supplyBig)} tokens` : "Whole tokens"}>
-                  <Input
-                    inputMode="numeric"
-                    value={f.supply}
-                    onChange={(e) => set("supply", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="1000000000"
-                  />
-                </Field>
-                <Field label="Decimals" error={err("decimals", errors.decimals)} hint="Standard is 18">
-                  <Input
-                    inputMode="numeric"
-                    value={f.decimals}
-                    onChange={(e) => set("decimals", e.target.value.replace(/[^\d]/g, ""))}
-                    placeholder="18"
-                  />
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field label="Logo" error={err("logoURI", errors.logoURI)}>
-                    <LogoPicker value={f.logoURI} onChange={(url) => set("logoURI", url)} symbol={f.symbol} />
-                  </Field>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Callout tone="neutral" icon={<IconWallet className="h-4 w-4" />}>
-                  The entire initial supply is minted to <strong className="text-fg">your connected wallet</strong>, which
-                  also becomes the token owner.
-                </Callout>
-              </div>
-            </SectionCard>
-          ) : (
+          <SectionCard
+            icon={<IconSettings className="h-5 w-5" />}
+            title="B20 bootstrap"
+            desc="These initCalls are executed atomically by the B20 Factory after creation."
+            className={panel.standard.card}
+            iconClassName={panel.standard.icon}
+          >
             <div className="space-y-5">
-              {/* Taxes */}
-              <SectionCard
-                icon={<IconTrendUp className="h-5 w-5" />}
-                title="Buy / sell tax"
-                desc="Take a fee on DEX trades, routed to a collector wallet. Total is hard-capped at 25%."
-                action={<Switch checked={f.taxEnabled} onChange={(v) => set("taxEnabled", v)} label="Enable tax" />}
-                className={createPanel.tax.card}
-                iconClassName={createPanel.tax.icon}
-              >
-                {f.taxEnabled && (
-                  <div className="space-y-5">
-                    <TaxSlider label="Buy tax" tone="positive" icon={<IconTrendUp className="h-4 w-4 text-positive" />} value={f.buyTax} onChange={(v) => set("buyTax", v)} error={errors.buyTax} />
-                    <TaxSlider label="Sell tax" tone="negative" icon={<IconTrendDown className="h-4 w-4 text-negative" />} value={f.sellTax} onChange={(v) => set("sellTax", v)} error={errors.sellTax} />
-                    {/* tax errors always show - they reflect an active misconfiguration, not a pristine field */}
-                    <TaxSlider label="Burn on transfer" tone="neutral" icon={<IconFlame className="h-4 w-4" />} value={f.burnTax} onChange={(v) => set("burnTax", v)} hint="Burned on every non-exempt transfer (deflationary)." />
-                    <Field label="Tax collector wallet" error={err("taxWallet", errors.taxWallet)} hint="Where buy/sell tax is sent. Defaults to your wallet.">
-                      <Input value={f.taxWallet} onChange={(e) => set("taxWallet", e.target.value)} placeholder={address ?? "0x..."} className="font-mono text-xs" />
-                    </Field>
-                    <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-                      Buy/sell tax only applies once you register your DEX pair in the dashboard after adding liquidity.
-                      Until then it behaves like a plain token.
-                    </Callout>
-                  </div>
-                )}
-                {!f.taxEnabled && <p className="text-sm text-faint">No trading tax. A clean, standard ERC-20 transfer.</p>}
-              </SectionCard>
+              <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-surface/80 px-4 py-3 dark:border-emerald-400/20 dark:bg-surface/70">
+                <div>
+                  <p className="text-sm font-medium">Supply cap</p>
+                  <p className="text-xs text-muted">B20 cap max is uint128. No cap uses the uint128 max sentinel.</p>
+                </div>
+                <Switch checked={f.capEnabled} onChange={(v) => set("capEnabled", v)} label="Cap supply" />
+              </div>
+              {f.capEnabled && (
+                <Field label="Supply cap" error={err("supplyCap", errors.supplyCap)} hint={capRaw && capRaw > 0n ? `${commafy(f.supplyCap)} tokens` : "Must be at least initial supply"}>
+                  <Input inputMode="decimal" value={f.supplyCap} onChange={(e) => set("supplyCap", cleanDecimal(e.target.value))} placeholder="1000000" />
+                </Field>
+              )}
+              <Field label="Contract URI" error={err("contractURI", errors.contractURI)} hint="Optional ERC-7572 metadata URI.">
+                <Input value={f.contractURI} onChange={(e) => set("contractURI", e.target.value.trim())} placeholder="ipfs://... or https://..." />
+              </Field>
 
-              {/* Mint */}
-              <SectionCard
-                icon={<IconCoins className="h-5 w-5" />}
-                title="Minting & supply cap"
-                desc="Allow creating more tokens later, with an optional permanent hard cap."
-                action={<Switch checked={f.mintable} onChange={(v) => set("mintable", v)} label="Enable minting" />}
-                className={createPanel.mint.card}
-                iconClassName={createPanel.mint.icon}
-              >
-                {f.mintable ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-surface/80 px-4 py-3 dark:border-emerald-400/20 dark:bg-surface/70">
-                      <div>
-                        <p className="text-sm font-medium">Hard cap</p>
-                        <p className="text-xs text-muted">Cap total supply so minting can never exceed it.</p>
-                      </div>
-                      <Switch checked={f.capped} onChange={(v) => set("capped", v)} label="Cap supply" />
-                    </div>
-                    {f.capped && (
-                      <Field label="Max supply" error={err("maxSupply", errors.maxSupply)} hint={maxSupplyBig && maxSupplyBig > 0n ? `${commafy(maxSupplyBig)} tokens` : "Whole tokens, at least initial supply"}>
-                        <Input
-                          inputMode="numeric"
-                          value={f.maxSupply}
-                          onChange={(e) => set("maxSupply", e.target.value.replace(/[^\d]/g, ""))}
-                          placeholder="2000000000"
-                        />
-                      </Field>
-                    )}
-                    <Callout tone="neutral" icon={<IconFlame className="h-4 w-4" />}>
-                      You can permanently disable minting anytime from the dashboard. This is a strong trust signal for holders.
-                    </Callout>
-                  </div>
-                ) : (
-                  <p className="text-sm text-faint">Fixed supply. No new tokens can ever be minted. (Recommended for memecoins.)</p>
-                )}
-              </SectionCard>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <RoleToggle title="Minter role" desc="Allows minting after launch." checked={f.grantMinter} onChange={(v) => set("grantMinter", v)} />
+                <RoleToggle title="Pause roles" desc="Allows pausing and unpausing transfers, minting or burning." checked={f.grantPauser} onChange={(v) => set("grantPauser", v)} />
+                <RoleToggle title="Metadata role" desc="Allows updating name, symbol and contract URI." checked={f.grantMetadata} onChange={(v) => set("grantMetadata", v)} />
+                <RoleToggle title="Operator role" desc="Allows Asset announcements and multiplier updates." checked={f.grantOperator} onChange={(v) => set("grantOperator", v)} />
+              </div>
 
-              {/* Limits */}
-              <SectionCard
-                icon={<IconUsers className="h-5 w-5" />}
-                title="Anti-whale limits"
-                desc="Cap how much a single wallet can hold or move, so snipers have less room to dump."
-                action={<Switch checked={f.limitsEnabled} onChange={(v) => set("limitsEnabled", v)} label="Enable limits" />}
-                className={createPanel.limits.card}
-                iconClassName={createPanel.limits.icon}
-              >
-                {f.limitsEnabled ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Max transaction" hint={`${f.maxTx}% of supply${supplyBig ? ` | ${commafy(percentOfSupply(supplyBig, f.maxTx))}` : ""}`}>
-                      <Slider value={Number(f.maxTx)} min={0.1} max={10} step={0.1} onChange={(v) => set("maxTx", String(v))} />
-                    </Field>
-                    <Field label="Max wallet" hint={`${f.maxWallet}% of supply${supplyBig ? ` | ${commafy(percentOfSupply(supplyBig, f.maxWallet))}` : ""}`}>
-                      <Slider value={Number(f.maxWallet)} min={0.1} max={10} step={0.1} onChange={(v) => set("maxWallet", String(v))} />
-                    </Field>
-                  </div>
-                ) : (
-                  <p className="text-sm text-faint">No holding or transfer limits.</p>
-                )}
-              </SectionCard>
-
-              <Callout tone="neutral" icon={<IconGauge className="h-4 w-4" />}>
-                <strong className="text-fg">Blacklist, whitelist, trading pause, ownership renounce, airdrop</strong> and
-                more are managed live after deployment from the <Link to="/dashboard" className="underline">dashboard</Link>.
+              <Callout tone="neutral" icon={<IconShield className="h-4 w-4" />}>
+                Your connected wallet becomes the initial <strong className="text-fg">DEFAULT_ADMIN_ROLE</strong> holder.
+                You can renounce the last admin from the dashboard when the token should become admin-less.
               </Callout>
             </div>
-          )}
+          </SectionCard>
         </div>
 
-        {/* ----------------------------- PREVIEW ----------------------------- */}
         <div className="lg:sticky lg:top-24 lg:h-fit">
-          <PreviewCard f={f} supply={supplyBig} />
-          <SecurityReportCard f={f} supply={supplyBig} decimalsOk={decimalsOk} hasErrors={hasErrors} />
+          <PreviewCard f={f} supplyRaw={supplyRaw} capRaw={capRaw} />
+          <B20ReportCard f={f} decimalsOk={decimalsOk} hasErrors={hasErrors} />
           <div className="mt-4">
             {!isConnected ? (
               <Card className="border-violet-200/80 bg-violet-50/60 p-4 text-center dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
-                <p className="mb-3 text-sm text-muted">Connect your wallet to deploy.</p>
+                <p className="mb-3 text-sm text-muted">Connect your wallet to create a B20 token.</p>
                 <div className="flex justify-center">
                   <WalletConnect />
                 </div>
@@ -460,182 +347,44 @@ export function Create() {
                 Switch to {chainName(DEFAULT_CHAIN_ID)} from the wallet menu.
               </Callout>
             ) : (
-              <Button size="lg" fullWidth loading={isSwitching || isPending || isMining} onClick={onDeploy} className="gap-2">
+              <Button size="lg" fullWidth loading={isSwitching || isPending || isMining} onClick={onCreate} className="gap-2">
                 <IconRocket className="h-5 w-5" />
-                {isSwitching ? "Switching network..." : isPending ? "Confirm in wallet..." : isMining ? "Deploying..." : "Deploy token"}
+                {isSwitching ? "Switching network..." : isPending ? "Confirm in wallet..." : isMining ? "Creating B20..." : "Create native B20"}
               </Button>
             )}
-            {hasErrors && isConnected && supported && (
-              <p className="mt-2 text-center text-xs text-negative">Fix the highlighted fields to deploy.</p>
-            )}
+            {hasErrors && isConnected && supported && <p className="mt-2 text-center text-xs text-negative">Fix the highlighted fields to continue.</p>}
+            {networkError && <p className="mt-2 text-center text-xs text-negative">{networkError}</p>}
             {error && (
               <p className="mt-2 text-center text-xs text-negative">
-                {error.message.includes("User rejected") ? "Transaction rejected." : "Deploy failed. Check console for details."}
+                {error.message.includes("User rejected") ? "Transaction rejected." : error.message.split("\n")[0].slice(0, 140)}
               </p>
             )}
-            {networkError && <p className="mt-2 text-center text-xs text-negative">{networkError}</p>}
           </div>
         </div>
       </div>
 
-      {/* Success modal */}
-      <SuccessModal
-        open={!!deployedAddress}
-        onClose={resetAll}
-        address={deployedAddress}
-        chainId={targetChainId}
-        cfg={deployedCfg}
-      />
+      <SuccessModal open={!!createdAddress} onClose={resetAll} address={createdAddress} chainId={targetChainId} cfg={pending?.config ?? null} />
     </div>
   );
 }
 
-/* ------------------------------- Subviews -------------------------------- */
-
-function TaxSlider({
-  label,
-  value,
-  onChange,
-  tone,
-  icon,
-  error,
-  hint,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  tone: "positive" | "negative" | "neutral";
-  icon: React.ReactNode;
-  error?: string;
-  hint?: string;
-}) {
+function RoleToggle({ title, desc, checked, onChange }: { title: string; desc: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 text-[13px] font-medium">
-          {icon} {label}
-        </span>
-        <Badge tone={tone === "neutral" ? "neutral" : tone}>{value.toFixed(1)}%</Badge>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3">
+      <div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted">{desc}</p>
       </div>
-      <Slider value={value} min={0} max={25} step={0.5} onChange={onChange} tone={tone} />
-      {error ? <p className="mt-1.5 text-xs text-negative">{error}</p> : hint ? <p className="mt-1.5 text-xs text-faint">{hint}</p> : null}
+      <Switch checked={checked} onChange={onChange} label={title} />
     </div>
   );
 }
 
-function maxBigInt(a: bigint, b: bigint) {
-  return a > b ? a : b;
-}
-
-function percentOfSupply(supply: bigint, pct: string) {
-  const bps = Math.max(0, Math.round(Number(pct) * 100));
-  if (!Number.isFinite(bps) || bps <= 0) return 0n;
-  return (supply * BigInt(bps)) / 10_000n;
-}
-
-function SecurityReportCard({
-  f,
-  supply,
-  decimalsOk,
-  hasErrors,
-}: {
-  f: FormState;
-  supply: bigint | null;
-  decimalsOk: boolean;
-  hasErrors: boolean;
-}) {
-  const checks = securityChecks(f, supply, decimalsOk, hasErrors);
-  const review = checks.filter((c) => c.tone === "warn").length;
-  const fail = checks.filter((c) => c.tone === "negative").length;
-  const score = Math.max(0, 100 - review * 8 - fail * 18);
-  const label = fail ? "Fix required" : review ? "Review" : "Strong";
-  const severity = [
-    { label: "Critical", value: fail, tone: fail ? "negative" : "positive" },
-    { label: "Review", value: review, tone: review ? "warn" : "positive" },
-    { label: "Passed", value: checks.length - review - fail, tone: "positive" },
-  ] as const;
-
-  return (
-    <Card className="mt-4 overflow-hidden border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
-      <div className="flex items-start justify-between gap-3 border-b border-emerald-200/70 bg-surface/80 px-5 py-4 dark:border-emerald-400/20 dark:bg-surface/70">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200">
-            <IconShield className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Audit-style security report</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Automated preflight checks for this token setup.</p>
-          </div>
-        </div>
-        <Badge tone={fail ? "negative" : review ? "warn" : "positive"}>{score}/100 {label}</Badge>
-      </div>
-      <div className="grid grid-cols-3 gap-2 px-5 pt-4">
-        {severity.map((item) => (
-          <div key={item.label} className="rounded-xl border border-border/70 bg-surface/75 px-3 py-2">
-            <p className="text-[10px] font-semibold uppercase text-faint">{item.label}</p>
-            <p className={cn("mt-1 text-lg font-semibold", item.tone === "negative" ? "text-negative" : item.tone === "warn" ? "text-amber-600 dark:text-amber-400" : "text-positive")}>{item.value}</p>
-          </div>
-        ))}
-      </div>
-      <div className="space-y-2 px-5 py-4">
-        {checks.map((check) => (
-          <div key={check.label} className="flex items-start gap-2 rounded-xl border border-border/70 bg-surface/75 px-3 py-2.5">
-            <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full", check.tone === "positive" ? "bg-positive/10 text-positive" : check.tone === "warn" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-negative/10 text-negative")}>
-              {check.tone === "positive" ? <IconCheck className="h-3.5 w-3.5" /> : <IconAlert className="h-3.5 w-3.5" />}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-fg">{check.label}</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{check.text}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="border-t border-emerald-200/70 px-5 py-3 text-[11px] leading-relaxed text-faint dark:border-emerald-400/20">
-        Not a formal audit. It helps you launch with safer defaults before public review.
-      </div>
-    </Card>
-  );
-}
-
-function securityChecks(f: FormState, supply: bigint | null, decimalsOk: boolean, hasErrors: boolean) {
-  const buyBurn = f.buyTax + f.burnTax;
-  const sellBurn = f.sellTax + f.burnTax;
-  return [
-    hasErrors || !supply || !decimalsOk
-      ? { tone: "negative" as const, label: "Input validation", text: "Fix highlighted fields before deploy." }
-      : { tone: "positive" as const, label: "Input validation", text: "Supply, decimals and addresses pass local checks." },
-    { tone: "positive" as const, label: "Compiler profile", text: "Solidity 0.8.35, optimizer 200 runs, Cancun EVM, deterministic metadata." },
-    f.mintable
-      ? f.capped
-        ? { tone: "warn" as const, label: "Mint authority", text: "Minting is enabled but capped. Disable minting after launch for stronger trust." }
-        : { tone: "negative" as const, label: "Mint authority", text: "Uncapped minting is a high centralization risk in most audit reports." }
-      : { tone: "positive" as const, label: "Supply control", text: "Fixed supply by default. No new tokens can be minted." },
-    f.taxEnabled
-      ? buyBurn > 15 || sellBurn > 15
-        ? { tone: "warn" as const, label: "Tax limits", text: "Taxes are within the 25% hard cap but may be flagged as high by reviewers." }
-        : { tone: "positive" as const, label: "Tax limits", text: "Taxes are enabled and remain inside the contract hard cap." }
-      : { tone: "positive" as const, label: "Transfer fees", text: "No buy or sell tax in the default configuration." },
-    f.limitsEnabled
-      ? { tone: "warn" as const, label: "Transfer limits", text: "Anti-whale limits are transparent, but reviewers may flag owner-controlled limits." }
-      : { tone: "positive" as const, label: "Transfer limits", text: "No holding or transfer limits by default." },
-    { tone: "warn" as const, label: "Owner powers", text: "Dashboard controls remain owner-only until you renounce ownership." },
-    { tone: "positive" as const, label: "Verification", text: "Dashboard supports one-click BaseScan source verification after deploy." },
-  ];
-}
-
-function PreviewCard({ f, supply }: { f: FormState; supply: bigint | null }) {
-  const symbol = f.symbol.trim().toUpperCase() || "TKN";
-  const flags: Array<{ label: string; on: boolean }> = [
-    { label: "Taxed", on: f.taxEnabled && (f.buyTax > 0 || f.sellTax > 0) },
-    { label: "Deflationary", on: f.taxEnabled && f.burnTax > 0 },
-    { label: "Mintable", on: f.mintable },
-    { label: "Capped", on: f.mintable && f.capped },
-    { label: "Anti-whale", on: f.limitsEnabled },
-  ].filter((x) => x.on);
-
+function PreviewCard({ f, supplyRaw, capRaw }: { f: FormState; supplyRaw: bigint | null; capRaw: bigint | null }) {
+  const symbol = f.symbol.trim().toUpperCase() || "B20";
   return (
     <Card className="overflow-hidden border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
-      <div className="h-1 bg-gradient-to-r from-sky-300 via-violet-200 to-emerald-200 dark:from-sky-400/50 dark:via-violet-400/30 dark:to-emerald-400/30" />
+      <div className="h-1 bg-gradient-to-r from-sky-300 via-emerald-200 to-violet-200 dark:from-sky-400/50 dark:via-emerald-400/30 dark:to-violet-400/30" />
       <div className="flex items-center gap-3 border-b border-sky-200/70 bg-surface/80 px-5 py-4 dark:border-sky-400/20 dark:bg-surface/70">
         {f.logoURI ? (
           <img src={f.logoURI} alt="" className="h-11 w-11 rounded-full border border-border object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
@@ -645,36 +394,80 @@ function PreviewCard({ f, supply }: { f: FormState; supply: bigint | null }) {
           </span>
         )}
         <div className="min-w-0">
-          <p className="truncate font-display text-2xl leading-none text-fg">{f.name.trim() || "Your Token"}</p>
+          <p className="truncate font-display text-2xl leading-none text-fg">{f.name.trim() || "Your B20 Token"}</p>
           <p className="font-mono text-xs text-muted">${symbol}</p>
         </div>
       </div>
       <div className="space-y-2.5 px-5 py-4 text-sm">
-        <Row label="Supply" value={supply && supply > 0n ? commafy(supply) : "-"} />
+        <Row label="Variant" value="Asset" />
         <Row label="Decimals" value={f.decimals || "18"} />
-        {f.taxEnabled && <Row label="Buy / Sell tax" value={`${f.buyTax}% / ${f.sellTax}%`} />}
-        {f.taxEnabled && f.burnTax > 0 && <Row label="Burn / transfer" value={`${f.burnTax}%`} />}
-        {f.mintable && <Row label="Max supply" value={f.capped && f.maxSupply ? commafy(f.maxSupply) : "Uncapped"} />}
-        {f.limitsEnabled && <Row label="Max wallet" value={`${f.maxWallet}%`} />}
+        <Row label="Initial supply" value={supplyRaw && supplyRaw > 0n ? commafy(f.supply) : "-"} />
+        <Row label="Supply cap" value={f.capEnabled && capRaw ? commafy(f.supplyCap) : "uint128 max"} />
+        <Row label="Factory" value="0xB20f..." />
       </div>
-      {flags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-t border-sky-200/70 bg-surface/60 px-5 py-3 dark:border-sky-400/20 dark:bg-surface/50">
-          {flags.map((x) => (
-            <Badge key={x.label} tone="accent">
-              <IconCheck className="h-3 w-3" /> {x.label}
-            </Badge>
-          ))}
+    </Card>
+  );
+}
+
+function B20ReportCard({ f, decimalsOk, hasErrors }: { f: FormState; decimalsOk: boolean; hasErrors: boolean }) {
+  const checks = [
+    hasErrors
+      ? { tone: "negative" as const, label: "Input validation", text: "Fix highlighted fields before creating the token." }
+      : { tone: "positive" as const, label: "Input validation", text: "Name, symbol, decimals and supply cap pass local checks." },
+    decimalsOk
+      ? { tone: "positive" as const, label: "Asset decimals", text: "B20 Asset decimals are inside the required 6-18 range." }
+      : { tone: "negative" as const, label: "Asset decimals", text: "Native B20 Asset tokens only support decimals from 6 to 18." },
+    { tone: "positive" as const, label: "Factory route", text: `Uses createB20 params version ${B20_CREATE_PARAMS_VERSION} on the fixed B20 Factory precompile.` },
+    f.grantMinter
+      ? { tone: "warn" as const, label: "Mint role", text: "Minter role remains active after launch. Revoke it when supply is complete." }
+      : { tone: "positive" as const, label: "Mint role", text: "No minter role is granted after the bootstrap mint." },
+    f.grantPauser
+      ? { tone: "warn" as const, label: "Pause roles", text: "Pause controls are operational admin powers. Use transparently." }
+      : { tone: "positive" as const, label: "Pause roles", text: "No pause role is granted." },
+  ];
+  const review = checks.filter((c) => c.tone === "warn").length;
+  const fail = checks.filter((c) => c.tone === "negative").length;
+  const score = Math.max(0, 100 - review * 8 - fail * 18);
+
+  return (
+    <Card className="mt-4 overflow-hidden border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
+      <div className="flex items-start justify-between gap-3 border-b border-emerald-200/70 bg-surface/80 px-5 py-4 dark:border-emerald-400/20 dark:bg-surface/70">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <IconShield className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">B20 standard check</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Factory, variant and role setup checks.</p>
+          </div>
         </div>
-      )}
+        <Badge tone={fail ? "negative" : review ? "warn" : "positive"}>{score}/100</Badge>
+      </div>
+      <div className="space-y-2 px-5 py-4">
+        {checks.map((check) => (
+          <div key={check.label} className="flex items-start gap-2 rounded-xl border border-border/70 bg-surface/75 px-3 py-2.5">
+            <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full", check.tone === "positive" ? "bg-positive/10 text-positive" : check.tone === "warn" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-negative/10 text-negative")}>
+              {check.tone === "positive" ? <IconCheck className="h-3.5 w-3.5" /> : <IconAlert className="h-3.5 w-3.5" />}
+            </span>
+            <div>
+              <p className="text-xs font-semibold text-fg">{check.label}</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{check.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-emerald-200/70 px-5 py-3 text-[11px] leading-relaxed text-faint dark:border-emerald-400/20">
+        B20 is native to Base. This app does not deploy custom Solidity token bytecode.
+      </div>
     </Card>
   );
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-4">
       <span className="text-muted">{label}</span>
-      <span className="font-medium">{value}</span>
+      <span className="truncate font-medium">{value}</span>
     </div>
   );
 }
@@ -690,16 +483,10 @@ function SuccessModal({
   onClose: () => void;
   address?: string;
   chainId: number;
-  cfg: TokenConfigInput | null;
+  cfg: B20CreateConfig | null;
 }) {
-  const net = "baseSepolia";
-  const verifyUrl = address ? `${explorerUrl(chainId)}/verifyContract?a=${address}` : "";
-  const argsFile = cfg ? buildVerifyArgs(cfg) : "";
-  const hardhatCommand = address ? verifyCommand(address, net) : "";
-  const readyCommand = address && cfg ? verifyReadyCommand(cfg, address, net) : "";
-
   return (
-    <Modal open={open} onClose={onClose} title="Token deployed" size="md">
+    <Modal open={open} onClose={onClose} title="B20 token created" size="md">
       {address && cfg && (
         <div className="space-y-5">
           <div className="rounded-xl border border-positive/30 bg-positive/[0.06] px-4 py-4 text-center">
@@ -707,11 +494,11 @@ function SuccessModal({
               <IconCheck className="h-5 w-5" />
             </div>
             <p className="text-sm text-muted">
-              <strong className="text-fg">{cfg.name_}</strong> (${cfg.symbol_}) is live on {chainName(chainId)}.
+              <strong className="text-fg">{cfg.name}</strong> (${cfg.symbol}) is live as a native B20 Asset on {chainName(chainId)}.
             </p>
           </div>
 
-          <Field label="Contract address">
+          <Field label="Token address">
             <div className="flex items-center gap-2">
               <code className="flex-1 truncate rounded-lg border border-border bg-elevated px-3 py-2 font-mono text-xs">{address}</code>
               <CopyButton value={address} />
@@ -719,7 +506,7 @@ function SuccessModal({
           </Field>
 
           <div className="grid grid-cols-2 gap-2">
-            <a href={`${explorerUrl(chainId)}/address/${address}`} target="_blank" rel="noreferrer">
+            <a href={`${explorerUrl(chainId)}/token/${address}`} target="_blank" rel="noreferrer">
               <Button variant="outline" fullWidth className="gap-1.5">
                 <IconExternal className="h-4 w-4" /> BaseScan
               </Button>
@@ -731,55 +518,26 @@ function SuccessModal({
             </Link>
           </div>
 
-          <div className="rounded-xl border border-border bg-elevated/50 px-4 py-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold">Verify on BaseScan</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Open the dashboard and press <strong className="text-fg">Verify & publish</strong>. No terminal command needed.
-                </p>
-              </div>
-              <Badge tone="positive" className="w-fit">
-                Base Sepolia
-              </Badge>
-            </div>
-
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <Link to={`/dashboard/${address}`} onClick={onClose}>
-                <Button fullWidth className="gap-1.5">
-                  <IconCheck className="h-4 w-4" /> Verify & publish
-                </Button>
-              </Link>
-              <a href={verifyUrl} target="_blank" rel="noreferrer">
-                <Button variant="outline" fullWidth className="gap-1.5">
-                  <IconExternal className="h-4 w-4" /> Open verify page
-                </Button>
-              </a>
-            </div>
-
-            <p className="mt-3 text-[11px] leading-relaxed text-faint">
-              The dashboard uses the server-side BaseScan key, keeps it private, and checks the result automatically.
-            </p>
-
-            <details className="mt-3 border-t border-border pt-3">
-              <summary className="cursor-pointer text-xs font-medium text-muted">Manual fallback</summary>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <CopyButton
-                  value={readyCommand}
-                  label="Copy ready command"
-                  className="h-9 justify-center rounded-xl bg-surface"
-                />
-                <CopyButton value={argsFile} label="Copy arguments.js" className="h-9 justify-center rounded-xl bg-surface" />
-                <CopyButton value={hardhatCommand} label="Copy Hardhat command" className="h-9 justify-center rounded-xl bg-surface" />
-              </div>
-            </details>
-          </div>
-
-          <p className="text-center text-[11px] text-faint">
-            Saved to your local token list. Find it anytime on the dashboard.
-          </p>
+          <Callout tone="positive" icon={<IconWallet className="h-4 w-4" />}>
+            Initial supply was minted through the factory bootstrap call to your connected wallet.
+          </Callout>
         </div>
       )}
     </Modal>
   );
+}
+
+function cleanDecimal(value: string) {
+  const clean = value.replace(/[^\d.]/g, "");
+  const [head, ...tail] = clean.split(".");
+  return tail.length ? `${head}.${tail.join("")}` : head;
+}
+
+function parseTokenAmount(value: string, decimals: number): bigint | null {
+  if (!value.trim() || !Number.isInteger(decimals)) return null;
+  try {
+    return parseUnits(value, decimals);
+  } catch {
+    return null;
+  }
 }

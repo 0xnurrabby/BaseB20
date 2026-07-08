@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccount, useSignMessage } from "wagmi";
 import { adminMessage } from "../lib/analytics";
-import { explorerUrl } from "../lib/wagmi";
+import { DEFAULT_CHAIN_ID, explorerUrl } from "../lib/wagmi";
 import { shortAddress } from "../lib/format";
 import { Badge, Button, Callout, Card, Spinner, cn } from "../components/ui";
 import { WalletConnect } from "../components/WalletConnect";
@@ -441,7 +441,7 @@ function TokenRow({ token }: { token: Summary["recentTokens"][number] }) {
       </div>
       {addr && (
         <a
-          href={`${explorerUrl(token.chain_id ?? 84532)}/address/${addr}`}
+          href={`${explorerUrl(token.chain_id ?? DEFAULT_CHAIN_ID)}/address/${addr}`}
           target="_blank"
           rel="noreferrer"
           className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint hover:bg-border/50 hover:text-fg")}
@@ -473,7 +473,7 @@ function EventRow({ event }: { event: Summary["recentEvents"][number] }) {
       </div>
       {addr && (
         <a
-          href={`${explorerUrl(event.chainId ?? 84532)}/address/${addr}`}
+          href={`${explorerUrl(event.chainId ?? DEFAULT_CHAIN_ID)}/address/${addr}`}
           target="_blank"
           rel="noreferrer"
           className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint hover:bg-border/50 hover:text-fg"

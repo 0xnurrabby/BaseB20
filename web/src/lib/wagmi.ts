@@ -1,26 +1,19 @@
 import { http, createConfig, createStorage } from "wagmi";
-import { base, baseSepolia } from "wagmi/chains";
+import { base } from "wagmi/chains";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 
-const mainnetEnabled = import.meta.env.VITE_ENABLE_BASE_MAINNET === "true";
-
-export const CHAINS = { baseSepolia, base } as const;
-export const DEFAULT_CHAIN = baseSepolia;
+export const CHAINS = { base } as const;
+export const DEFAULT_CHAIN = base;
 export const DEFAULT_CHAIN_ID = DEFAULT_CHAIN.id;
-export type SupportedChainId = typeof baseSepolia.id | typeof base.id;
-export const ACTIVE_CHAINS = (mainnetEnabled ? [baseSepolia, base] : [baseSepolia]) as [
-  typeof baseSepolia,
-  ...Array<typeof base>
-];
+export type SupportedChainId = typeof base.id;
+export const ACTIVE_CHAINS = [base] as const;
 export const ACTIVE_CHAIN_IDS = ACTIVE_CHAINS.map((chain) => chain.id) as SupportedChainId[];
 
 const EXPLORERS: Record<number, string> = {
-  [baseSepolia.id]: "https://sepolia.basescan.org",
   [base.id]: "https://basescan.org",
 };
 
 const RPC_URLS: Record<number, string> = {
-  [baseSepolia.id]: "https://sepolia.base.org",
   [base.id]: "https://mainnet.base.org",
 };
 
@@ -36,7 +29,7 @@ const connectors = [
           showQrModal: true,
           metadata: {
             name: "B20 Base Token Creator & Manager",
-            description: "Create and manage gas-optimized ERC-20 tokens on Base.",
+            description: "Create and manage native B20 tokens on Base mainnet.",
             url: "https://base.nurlab.xyz",
             icons: [],
           },
@@ -50,7 +43,6 @@ export const wagmiConfig = createConfig({
   connectors,
   storage: createStorage({ storage: typeof window !== "undefined" ? window.localStorage : undefined }),
   transports: {
-    [baseSepolia.id]: http(RPC_URLS[baseSepolia.id]),
     [base.id]: http(RPC_URLS[base.id]),
   },
 });
@@ -60,7 +52,6 @@ export function explorerUrl(chainId: number): string {
 }
 
 export function chainName(chainId: number): string {
-  if (chainId === baseSepolia.id) return "Base Sepolia";
   if (chainId === base.id) return "Base";
   return `Chain ${chainId}`;
 }

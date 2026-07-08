@@ -1,54 +1,64 @@
-# B20 - Base Token Creator & Manager
+# B20 - Base Native Token Studio
 
-A no-code studio to create and manage gas-optimized ERC-20 tokens on Base Sepolia.
-Connect a wallet, configure a token, deploy it in one transaction, then control
-settings live from an owner dashboard: taxes, limits, minting, blacklists,
-ownership, airdrops and more. Fully BaseScan-verifiable.
+A no-code studio to create and manage native B20 Asset tokens on Base mainnet.
+The app calls the official Base B20 Factory precompile instead of deploying a
+custom Solidity token contract.
 
 ```
 BaseB20/
-  contracts/  # Hardhat + Solidity (the B20Token contract)
-  web/        # Vite + React + TypeScript + wagmi frontend
-  api/        # Vercel serverless helpers
+  web/  # Vite + React + TypeScript + wagmi frontend
+  api/  # Vercel serverless helpers for uploads, analytics and admin stats
 ```
+
+## What B20 Means Here
+
+B20 is Base's native token standard. It is an ERC-20 superset implemented as
+chain precompiles, so standard ERC-20 calls and events remain compatible while
+B20 adds roles, supply caps, granular pause, policy hooks, memos, permit and
+Asset-specific features.
+
+This app currently creates the B20 Asset variant on Base mainnet:
+
+- Network: Base mainnet
+- Chain ID: `8453`
+- RPC: `https://mainnet.base.org`
+- Explorer: `https://basescan.org`
+- B20 Factory: `0xB20f000000000000000000000000000000000000`
+- Activation Registry: `0x8453000000000000000000000000000000000001`
+- Policy Registry: `0x8453000000000000000000000000000000000002`
+
+Official references:
+
+- https://docs.base.org/get-started/launch-b20-token
+- https://docs.base.org/base-chain/specs/upgrades/beryl/b20
 
 ## Features
 
-**Create (no code):**
+**Create**
 
-- Name, symbol, supply, decimals, on-chain logo URL
-- Buy / sell tax + burn-on-transfer (combined tax hard-capped at 25% on-chain)
-- Optional minting with a permanent hard cap
-- Anti-whale limits: max transaction and max wallet
-- The full supply is minted to you; you become the owner
+- B20 Asset token creation through `createB20`
+- Name, symbol, initial supply and immutable Asset decimals
+- Asset decimals validation from 6 to 18
+- Supply cap with uint128 max as the no-cap sentinel
+- Logo URI stored as Asset `extraMetadata("logoURI")`
+- Optional `contractURI`
+- Bootstrap role grants for mint, pause, metadata and operator access
+- Initial supply minted during the factory creation transaction
 
-**Manage (live dashboard):**
+**Dashboard**
 
-- Buy/sell/burn tax sliders (25% ceiling enforced in the contract)
-- Change the tax collector wallet
-- Mint tokens, or disable minting forever
-- Enable trading (one-way launch gate) + emergency pause
-- Register DEX pairs so buy/sell tax applies to trades
-- Blacklist bots/scammers; strict whitelist mode
-- Toggle and retune anti-whale limits
-- Batch airdrop to many wallets in one transaction
-- Rescue foreign tokens / ETH stuck in the contract
-- 2-step ownership transfer or renounce
+- Factory-created token detection
+- Supply, balance, cap, decimals and role overview
+- Single mint and batch mint through native B20 methods
+- Supply cap update
+- Granular pause for transfer, mint and burn features
+- Metadata updates for name, symbol, contractURI and extra metadata
+- Role grant, revoke and renounce controls
+- `renounceLastAdmin()` path for a permanent admin-less token
+- Transfer with bytes32 memo
+- BaseScan token and factory links
 
 ## Quick Start
-
-### 1. Contract
-
-```bash
-cd contracts
-npm install
-npm run build
-```
-
-`npm run build` compiles the contract and exports ABI/bytecode into
-`web/src/contracts/B20Token.json`. Re-run it whenever you change Solidity.
-
-### 2. Web App
 
 ```bash
 cd web
@@ -57,73 +67,52 @@ cp .env.example .env
 npm run dev
 ```
 
-Build for production with `npm run build` (output in `web/dist`).
+Build for production:
 
-## Network
+```bash
+cd web
+npm run build
+```
 
-The website is currently enabled only for Base Sepolia while Base mainnet B20 is
-paused.
+The Vercel project serves the Vite build from `web/dist` and the serverless
+routes from `api/`.
 
-| Network      | Chain ID | RPC                      | Explorer                     |
-| ------------ | -------- | ------------------------ | ---------------------------- |
-| Base Sepolia | `84532`  | https://sepolia.base.org | https://sepolia.basescan.org |
+## Environment
 
-Get test ETH from a Base Sepolia faucet before deploying.
+Frontend:
 
-## Deploying & Verifying
+- `VITE_WALLETCONNECT_PROJECT_ID`, optional WalletConnect project ID
 
-You deploy straight from the browser. The app signs a contract-creation
-transaction with your wallet. Open the deployed token in the dashboard and press
-`Verify & publish`. The server submits the exact compiler input and constructor
-arguments to BaseScan, then checks the result automatically.
+Server:
 
-Set `BASESCAN_API_KEY` in Vercel so the one-click dashboard verifier can call
-the BaseScan / Etherscan V2 API. `BASE_SEPOLIA_RPC_URL` is optional; the app
-defaults to the public Base Sepolia RPC.
+- `IMGBB_API_KEY`, server-side logo upload key
+- `DATABASE_URL`, Neon connection string for analytics and admin stats
+- `ADMIN_ADDRESSES`, comma-separated wallet addresses allowed into `/admin`
+- `ANALYTICS_SALT`, optional salt for anonymous visitor hashing
 
-`hardhat.config.js` is also scoped to Base Sepolia right now to prevent accidental
-mainnet usage.
+Do not use `VITE_` for secrets. Vite exposes `VITE_` variables to browser code.
 
-## ImgBB Uploads
+## BaseScan
 
-Logo uploads go through the Vercel serverless route at `api/upload-logo.js`.
-Keep `IMGBB_API_KEY` server-side in Vercel or your local environment. Do not add
-an ImgBB key as a `VITE_` variable, because Vite exposes those to browser code.
+Native B20 tokens do not require user Solidity source verification. The user
+calls the Base B20 Factory precompile, and the token is created by Base's native
+implementation. The dashboard links to the BaseScan token page and factory page.
 
-## Admin Analytics
+## Security Notes
 
-The `/admin` route reads analytics from Neon through serverless API routes.
-Set `DATABASE_URL` and `ADMIN_ADDRESSES` in Vercel. `ADMIN_ADDRESSES` is a
-comma-separated list of wallet addresses that are allowed to sign in.
-
-## A Note On Base Native B20
-
-Base's Beryl upgrade introduces a native token standard also called B20, built as
-chain-level precompiles for regulated stablecoin / RWA issuers. Its mainnet
-rollout is currently paused, and it is separate from this app's classic Solidity
-ERC-20 flow.
-
-This studio deploys an audited-component Solidity ERC-20 so you can test taxes,
-anti-whale limits and verification on Base Sepolia now. A native-token path can
-be added later when Base mainnet support is live again.
-
-## Security
-
-- Non-custodial. The app never holds your keys, funds, or ownership.
-- Token creation includes automated preflight checks for supply math, decimals,
-  address format, fee caps, mint risk, owner powers and verification readiness.
-- Contracts are immutable once deployed. Test on Sepolia every time.
-- The 25% tax ceiling is enforced in the contract; the owner cannot exceed it.
-- The contract rejects zero supply, decimals above 18, and supply/cap/limit
-  values that cannot be safely scaled on-chain.
-- Owner powers (blacklist, pause, tax) are centralised controls. Renounce
-  ownership when you want to prove they can never be used.
-- The security profile is an audit-style first pass, not a formal audit or
-  guarantee. Launch responsibly and follow your local rules.
+- Non-custodial. The app never holds private keys, funds or role ownership.
+- Creation validates Asset decimals, supply math, cap bounds and metadata URI
+  shape before sending the factory call.
+- Minting always respects the native B20 supply cap.
+- Role grants are visible on-chain. Treat DEFAULT_ADMIN_ROLE, MINT_ROLE,
+  PAUSE_ROLE, UNPAUSE_ROLE, METADATA_ROLE and OPERATOR_ROLE as real admin power.
+- `renounceLastAdmin()` is permanent. Use it only when no future admin changes
+  are needed.
+- The app follows the documented B20 surfaces, but it is not a legal, financial
+  or formal audit guarantee.
 
 ## Tech
 
-- Contract: Solidity 0.8.35, OpenZeppelin v5, custom errors, packed storage,
-  optimizer on.
-- Frontend: Vite, React 18, TypeScript, Tailwind CSS, wagmi v2 + viem,
-  TanStack Query, React Router.
+- Frontend: Vite, React 18, TypeScript, Tailwind CSS, wagmi, viem, TanStack
+  Query and React Router.
+- Serverless: Vercel API routes for analytics, admin stats and ImgBB uploads.

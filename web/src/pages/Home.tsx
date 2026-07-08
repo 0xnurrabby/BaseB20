@@ -2,80 +2,107 @@ import { Link } from "react-router-dom";
 import { Badge, Button, Card } from "../components/ui";
 import {
   IconArrowRight,
-  IconBan,
+  IconBook,
+  IconCheck,
   IconCoins,
-  IconFlame,
   IconGauge,
-  IconLifebuoy,
   IconLock,
+  IconPause,
   IconRocket,
   IconSend,
   IconShield,
   IconSparkles,
-  IconTrendDown,
-  IconTrendUp,
   IconUsers,
 } from "../components/icons";
+import { B20_FACTORY_ADDRESS } from "../lib/contract";
 
 const FEATURES = [
-  { icon: IconTrendUp, title: "Buy / sell tax", desc: "Separate buy and sell fees to a collector wallet. Hard-capped at 25% on-chain; impossible to rug." },
-  { icon: IconFlame, title: "Burn on transfer", desc: "Deflationary by design. Burn a slice of every transfer automatically." },
-  { icon: IconCoins, title: "Mint and hard cap", desc: "Optional minting with a permanent max-supply cap, plus a one-way disable switch." },
-  { icon: IconUsers, title: "Anti-whale limits", desc: "Max wallet and max transaction caps stop snipers from buying the whole supply at once." },
-  { icon: IconBan, title: "Blacklist and whitelist", desc: "Block bots and malicious wallets instantly, or run a strict allowlist launch." },
-  { icon: IconLock, title: "Trading gate and pause", desc: "Launch trading on your signal, and pause instantly in an emergency." },
-  { icon: IconSend, title: "Batch airdrop", desc: "Send tokens to hundreds of wallets in a single transaction." },
-  { icon: IconLifebuoy, title: "Rescue stuck funds", desc: "Recover foreign tokens or ETH accidentally sent to your contract." },
+  { icon: IconRocket, title: "Native factory launch", desc: "Create an Asset variant through the Base B20 Factory precompile on Base mainnet." },
+  { icon: IconCheck, title: "ERC-20 compatible", desc: "B20 is an ERC-20 superset, so balances, transfers, approvals and events work with ERC-20 tooling." },
+  { icon: IconShield, title: "Role-based control", desc: "Use DEFAULT_ADMIN_ROLE, MINT_ROLE, PAUSE_ROLE, METADATA_ROLE and OPERATOR_ROLE cleanly." },
+  { icon: IconCoins, title: "Supply cap", desc: "Minting respects the native B20 supply cap, with uint128 max used as the no-cap sentinel." },
+  { icon: IconPause, title: "Granular pause", desc: "Pause transfers, minting or burning independently through native B20 pause controls." },
+  { icon: IconSend, title: "Memo transfers", desc: "Attach bytes32 memos to transfers for invoices, orders and off-chain reconciliation." },
+  { icon: IconUsers, title: "Batch mint", desc: "Asset tokens support batched issuance for clean distributions from the dashboard." },
+  { icon: IconLock, title: "Admin-less option", desc: "When setup is complete, the final admin can be renounced with the native B20 path." },
+];
+
+const STEPS = [
+  { n: "01", icon: IconCoins, t: "Configure", d: "Choose name, symbol, decimals, initial supply, cap, logo and bootstrap roles." },
+  { n: "02", icon: IconRocket, t: "Create", d: "Sign one factory transaction on Base mainnet. The token is created by the B20 precompile." },
+  { n: "03", icon: IconGauge, t: "Manage", d: "Use the dashboard for minting, roles, pause, metadata, memo transfers and BaseScan links." },
 ];
 
 export function Home() {
   return (
     <div>
-      <section className="relative overflow-hidden border-b border-border">
+      <section className="relative overflow-hidden border-b border-border bg-surface/40">
         <div className="pointer-events-none absolute inset-0 grid-dots opacity-70" />
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-positive/10 blur-3xl" />
-        <div className="relative mx-auto max-w-6xl px-4 py-20 text-center sm:px-6 sm:py-28">
-          <Badge tone="accent" className="mx-auto mb-6">
-            <IconSparkles className="h-3.5 w-3.5" /> Built for Base Sepolia
-          </Badge>
-          <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-            Launch a token on Base Sepolia.
-            <br />
-            <span className="text-muted">Then actually run it.</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-[15px] leading-relaxed text-muted sm:text-lg">
-            Create a gas-optimized, BaseScan-verifiable ERC-20 in minutes. No code. Then manage
-            taxes, limits, minting and more live from a full owner dashboard.
-          </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link to="/create">
-              <Button size="lg" className="gap-2">
-                <IconRocket className="h-4.5 w-4.5" /> Create your token
-              </Button>
-            </Link>
-            <Link to="/dashboard">
-              <Button size="lg" variant="outline" className="gap-2">
-                <IconGauge className="h-4.5 w-4.5" /> Open dashboard
-              </Button>
-            </Link>
+        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <div className="grid gap-10 lg:grid-cols-[1fr_390px] lg:items-center">
+            <div>
+              <Badge tone="accent" className="mb-6">
+                <IconSparkles className="h-3.5 w-3.5" /> Base mainnet native B20
+              </Badge>
+              <h1 className="max-w-3xl font-display text-5xl font-semibold leading-[0.98] tracking-tight sm:text-7xl">
+                Launch a native B20 token on Base.
+              </h1>
+              <p className="mt-6 max-w-2xl text-[15px] leading-7 text-muted sm:text-lg">
+                Create a Base-native Asset token with the official B20 Factory precompile. No custom Solidity token bytecode and no legacy custom-token flow.
+              </p>
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <Link to="/create">
+                  <Button size="lg" className="gap-2">
+                    <IconRocket className="h-4.5 w-4.5" /> Create B20 token
+                  </Button>
+                </Link>
+                <Link to="/dashboard">
+                  <Button size="lg" variant="outline" className="gap-2">
+                    <IconGauge className="h-4.5 w-4.5" /> Open dashboard
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-7 flex flex-wrap gap-2">
+                {["Chain 8453", "Factory 0xB20f...", "Asset decimals 6-18", "ERC-20 compatible"].map((item) => (
+                  <span key={item} className="rounded-full border border-border bg-bg/80 px-3 py-1.5 text-xs font-medium text-muted">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/65 p-5 shadow-card dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Launch preview</p>
+                  <p className="mt-1 text-xs text-muted">Native B20 Asset on Base mainnet</p>
+                </div>
+                <Badge tone="positive"><IconCheck className="h-3 w-3" /> Ready</Badge>
+              </div>
+              <div className="space-y-3">
+                <PreviewRow label="Factory" value={`${B20_FACTORY_ADDRESS.slice(0, 8)}...${B20_FACTORY_ADDRESS.slice(-4)}`} />
+                <PreviewRow label="Variant" value="Asset" />
+                <PreviewRow label="Initial admin" value="Connected wallet" />
+                <PreviewRow label="Bootstrap" value="cap, roles, metadata, mint" />
+              </div>
+              <div className="mt-5 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm leading-relaxed text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/[0.08] dark:text-emerald-100">
+                Initial supply can be minted during the factory creation call, so users do not need a second setup transaction.
+              </div>
+            </div>
           </div>
-          <p className="mt-6 text-xs text-faint">
-            Non-custodial. You keep the keys and the ownership. Verify on BaseScan in one command.
-          </p>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-18">
         <div className="mb-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Everything, built in</h2>
-            <p className="mt-2 max-w-xl text-[15px] text-muted">
-              The advanced features that normally take a Solidity dev and an audit, toggled on with a
-              switch, safety rails included.
+            <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Built around the actual B20 standard</h2>
+            <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted">
+              The app now targets Base mainnet only and uses the official native B20 surfaces that Base documents.
             </p>
           </div>
           <Link to="/docs" className="inline-flex items-center gap-1.5 text-sm font-medium text-fg hover:opacity-70">
-            Read the docs <IconArrowRight className="h-4 w-4" />
+            Read docs <IconArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -91,16 +118,12 @@ export function Home() {
         </div>
       </section>
 
-      <section className="border-t border-border bg-surface/40">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Three steps to launch</h2>
+      <section className="border-y border-border bg-surface/45">
+        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-18">
+          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Three steps to launch</h2>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {[
-              { n: "01", icon: IconCoins, t: "Configure", d: "Pick a name, supply and logo. Flip on the advanced features you want: taxes, limits, mint, blacklist." },
-              { n: "02", icon: IconRocket, t: "Deploy", d: "Sign one transaction. Your contract goes live on Base Sepolia and is instantly BaseScan-verifiable." },
-              { n: "03", icon: IconGauge, t: "Manage", d: "Open the dashboard to tune taxes with sliders, airdrop, pause, renounce ownership and more." },
-            ].map(({ n, icon: Icon, t, d }) => (
-              <div key={n} className="relative">
+            {STEPS.map(({ n, icon: Icon, t, d }) => (
+              <div key={n}>
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-fg">
                     <Icon className="h-5 w-5" />
@@ -115,43 +138,33 @@ export function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <Card className="flex flex-col items-start gap-5 p-6 sm:flex-row sm:items-center sm:p-8">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-border bg-elevated">
-            <IconShield className="h-6 w-6" />
-          </span>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold">Sepolia now, mainnet B20 later</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              This studio is Base Sepolia-only while Base mainnet B20 is paused. You still get a
-              battle-tested Solidity ERC-20 with taxes, limits and BaseScan verification for testing
-              right now. We explain how that differs from Base native B20 in the docs.
-            </p>
-          </div>
-          <Link to="/docs">
-            <Button variant="outline" className="gap-2 whitespace-nowrap">
-              Learn more <IconArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </Card>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="flex items-center gap-4 border-positive/25 bg-positive/[0.04] p-5">
-            <IconTrendUp className="h-6 w-6 text-positive" />
-            <p className="text-sm text-muted">
-              <strong className="text-fg">Buy tax</strong> routed to your collector wallet on every DEX buy.
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="border-emerald-200/80 bg-emerald-50/55 p-6 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
+            <IconShield className="h-6 w-6 text-positive" />
+            <h3 className="mt-4 text-lg font-semibold">Correct mainnet path</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              The app is pinned to Base mainnet chain ID 8453 and links to basescan.org. Legacy custom deployment paths have been removed.
             </p>
           </Card>
-          <Card className="flex items-center gap-4 border-negative/25 bg-negative/[0.04] p-5">
-            <IconTrendDown className="h-6 w-6 text-negative" />
-            <p className="text-sm text-muted">
-              <strong className="text-fg">Sell tax</strong> with a hard 25% ceiling, enforced in the contract.
+          <Card className="border-violet-200/80 bg-violet-50/55 p-6 dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
+            <IconBook className="h-6 w-6 text-fg" />
+            <h3 className="mt-4 text-lg font-semibold">Source-aware docs</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Documentation now describes B20 as Base's native ERC-20 superset precompile standard, with Factory, roles, policies, pause, permit, and Asset features explained correctly.
             </p>
           </Card>
         </div>
       </section>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface/80 px-4 py-3 text-sm">
+      <span className="text-muted">{label}</span>
+      <span className="truncate font-medium text-fg">{value}</span>
     </div>
   );
 }

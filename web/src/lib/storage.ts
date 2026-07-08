@@ -1,6 +1,4 @@
-/** Persisted registry of tokens the user has created / imported, per chain. */
-
-import type { SerializableTokenConfig } from "./contract";
+/** Persisted registry of B20 tokens the user has created / imported, per chain. */
 
 export interface SavedToken {
   address: string;
@@ -10,9 +8,7 @@ export interface SavedToken {
   createdAt: number;
   deployer?: string;
   txHash?: string;
-  verifyConfig?: SerializableTokenConfig;
-  verifyGuid?: string;
-  verifiedAt?: number;
+  logoURI?: string;
 }
 
 const KEY = "b20.tokens.v1";
