@@ -69,10 +69,12 @@ async function tryProxyVerification(address) {
     if (latest.status === "1") break;
   }
 
+  const message = String(latest.result || latest.message || "Proxy verification submitted.");
+  const stillPending = /pending|queue|progress|submitted/i.test(message);
   return {
-    status: latest.status === "1" ? "verified" : "pending",
+    status: latest.status === "1" ? "verified" : stillPending ? "pending" : "blocked",
     guid,
-    message: String(latest.result || latest.message || "Proxy verification submitted."),
+    message,
     raw: latest,
   };
 }
@@ -139,7 +141,11 @@ module.exports = async function handler(req, res) {
       steps.push({
         key: "source",
         status: proxy.status === "verified" ? "done" : proxy.status === "pending" ? "pending" : "blocked",
-        title: proxy.status === "verified" ? "Proxy verification accepted" : "Auto source verification blocked by BaseScan",
+        title: proxy.status === "verified"
+          ? "Proxy verification accepted"
+          : proxy.status === "pending"
+            ? "BaseScan verification pending"
+            : "Auto source verification blocked by BaseScan",
         detail: proxy.message,
       });
     }
