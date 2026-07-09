@@ -21,7 +21,7 @@ async function basescan(params, method = "GET") {
   body.set("apikey", key);
   Object.entries(params).forEach(([name, value]) => body.set(name, String(value)));
 
-  const url = method === "POST" ? API_URL : `${API_URL}?${body.toString()}`;
+  const url = `${API_URL}?${body.toString()}`;
   const res = await fetch(url, method === "POST"
     ? {
         method: "POST",
