@@ -23,7 +23,6 @@ function fileToBase64(file: File): Promise<string> {
 
 export interface UploadResult {
   url: string; // direct image URL
-  displayUrl: string; // imgbb-optimized display URL
   deleteUrl?: string;
 }
 
@@ -55,7 +54,6 @@ export async function uploadImage(file: File): Promise<UploadResult> {
 
   const json = (await res.json().catch(() => ({}))) as {
     url?: string;
-    displayUrl?: string;
     deleteUrl?: string;
     error?: string;
   };
@@ -69,7 +67,6 @@ export async function uploadImage(file: File): Promise<UploadResult> {
 
   return {
     url: json.url,
-    displayUrl: json.displayUrl ?? json.url,
     deleteUrl: json.deleteUrl,
   };
 }

@@ -41,6 +41,7 @@ import { TokenLogo } from "../components/TokenLogo";
 import { AddToWalletButton } from "../components/AddToWalletButton";
 import { LogoPicker } from "../components/LogoPicker";
 import { buildTokenMetadataUri } from "../lib/metadata";
+import { logoUrlError } from "../lib/image-url";
 
 type RoleKey = keyof typeof B20_ROLES;
 
@@ -679,7 +680,8 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     setLogoURI(token.logoURI);
   }, [token.address, token.name, token.symbol, token.contractURI, token.logoURI]);
 
-  const suggestedContractURI = logoURI.trim()
+  const logoError = logoUrlError(logoURI);
+  const suggestedContractURI = logoURI.trim() && !logoError
     ? buildTokenMetadataUri({ name: name || token.name, symbol: symbol || token.symbol, image: logoURI })
     : "";
 
@@ -737,13 +739,17 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
             </a>
           </div>
         )}
-        <Field label="Logo image" hint="Upload from your device or paste a direct PNG, JPG, WEBP or IPFS image link.">
+        <Field
+          label="Logo image"
+          error={logoError}
+          hint="ImgBB upload saves Direct link automatically. If pasting manually, use i.ibb.co direct image link."
+        >
           <LogoPicker value={logoURI} onChange={setLogoURI} symbol={symbol || token.symbol} disabled={!canMetadata} />
           <div className="mt-3 flex gap-2">
             <Input value={logoURI} onChange={(e) => setLogoURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
             <TxButton
               variant="secondary"
-              disabled={!canMetadata || logoURI === token.logoURI}
+              disabled={!canMetadata || !!logoError || logoURI === token.logoURI}
               build={() => ({ address: token.address, abi: B20_ABI, functionName: "updateExtraMetadata", args: ["logoURI", logoURI.trim()] })}
               onSuccess={() => {
                 saveToken({ address: token.address, name: token.name, symbol: token.symbol, chainId, createdAt: Date.now(), logoURI: logoURI.trim() });

@@ -232,7 +232,7 @@ const SECTIONS: Section[] = [
       <>
         <InfoGrid
           rows={[
-            ["Logo image", "Direct image link created after upload, usually an ImgBB URL"],
+            ["Logo image", "Direct image link created after upload, usually an i.ibb.co ImgBB URL"],
             ["Metadata JSON", "JSON link for wallets and explorers. Click Use generated JSON after saving the logo image"],
             ["Manual metadata", "Only needed if you already host your own JSON on IPFS or HTTPS"],
             ["Custom key/value", "Advanced B20 extraMetadata. Hidden from the normal dashboard because most tokens do not need it"],
@@ -241,6 +241,9 @@ const SECTIONS: Section[] = [
         />
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
           For normal launches: upload logo, save the logo image on-chain, click Use generated JSON, then save Metadata JSON.
+        </Callout>
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
+          Do not paste ImgBB Viewer links like ibb.co/abc. Wallets need Direct links like i.ibb.co/folder/image.png.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
           Some wallets, including Rabby, may reject direct automatic import until their indexer recognizes a new native

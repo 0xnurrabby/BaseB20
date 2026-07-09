@@ -34,6 +34,28 @@ function decodedBase64Bytes(value) {
   return Math.floor((value.length * 3) / 4) - padding;
 }
 
+function isDirectImageUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    if (host === "ibb.co" || host === "www.ibb.co") return false;
+    return /\.(png|jpe?g|gif|webp)$/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function pickDirectImageUrl(data) {
+  const candidates = [
+    data?.image?.url,
+    data?.display_url,
+    data?.url,
+  ];
+  return candidates.find(isDirectImageUrl) || "";
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("allow", "POST");
@@ -88,13 +110,13 @@ module.exports = async function handler(req, res) {
   }
 
   const json = await uploadRes.json();
-  if (!json?.success || !json?.data?.url) {
+  const directUrl = pickDirectImageUrl(json?.data);
+  if (!json?.success || !directUrl) {
     return send(res, 400, { error: json?.error?.message ?? "Upload failed. Try a different image." });
   }
 
   return send(res, 200, {
-    url: json.data.url,
-    displayUrl: json.data.display_url ?? json.data.url,
+    url: directUrl,
     deleteUrl: json.data.delete_url,
   });
 };

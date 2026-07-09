@@ -66,7 +66,7 @@ export function LogoPicker({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       setSelectedFile(null);
-      onChange(res.displayUrl || res.url);
+      onChange(res.url);
       setStatus("done");
       setTimeout(() => setStatus("idle"), 1600);
     } catch (e) {

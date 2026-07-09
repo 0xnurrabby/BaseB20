@@ -47,6 +47,7 @@ import { LogoPicker } from "../components/LogoPicker";
 import { TokenLogo } from "../components/TokenLogo";
 import { AddToWalletButton } from "../components/AddToWalletButton";
 import { buildTokenMetadataUri } from "../lib/metadata";
+import { logoUrlError } from "../lib/image-url";
 
 interface FormState {
   name: string;
@@ -139,7 +140,10 @@ export function Create() {
       else if (capRaw > MAX_UINT128) e.supplyCap = "B20 supply cap cannot exceed uint128 max";
     }
     if (f.contractURI && !/^(https?|ipfs):\/\//.test(f.contractURI)) e.contractURI = "Use an https:// or ipfs:// URI";
-    if (f.logoURI && !/^(https?|ipfs):\/\//.test(f.logoURI)) e.logoURI = "Use an https:// or ipfs:// URL";
+    if (f.logoURI) {
+      const logoError = logoUrlError(f.logoURI);
+      if (logoError) e.logoURI = logoError;
+    }
     return e;
   }, [f, decimalsOk, supplyRaw, capRaw]);
 
@@ -309,7 +313,7 @@ export function Create() {
                 <Input inputMode="numeric" value={f.decimals} onChange={(e) => set("decimals", e.target.value.replace(/[^\d]/g, ""))} placeholder="18" />
               </Field>
               <div className="sm:col-span-2">
-                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="PNG or WEBP works best in wallets.">
+                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="Upload saves ImgBB Direct link automatically.">
                   <LogoPicker value={f.logoURI} onChange={(url) => set("logoURI", url)} symbol={f.symbol} />
                 </Field>
               </div>
