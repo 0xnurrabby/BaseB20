@@ -289,12 +289,12 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <P>
-          BaseScan can still show Verify and Publish on the Contract tab. Use the dashboard BaseScan Publish panel
-          after launch. It opens the token page, verification page, cross-chain verify view, Verify Address and Token Info / Logo form.
+          BaseScan can still show Verify and Publish on the Contract tab. Use Auto publish in the dashboard first.
+          The app runs BaseScan API checks, attempts the supported verification path and copies the publish pack.
         </P>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Recommended order: save logo + JSON in Metadata, copy the publish pack, run Verify and Publish, verify the
-          address if BaseScan asks, then submit Token Info / Logo.
+          Recommended order: save logo + JSON in Metadata, then press Auto publish. If BaseScan requires logged-in
+          ownership review for the logo, the app shows that exact blocker.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
           BaseScan header logo is not automatic from on-chain metadata. BaseScan requires a Token Info / Logo request,

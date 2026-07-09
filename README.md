@@ -94,12 +94,12 @@ Do not use `VITE_` for secrets. Vite exposes `VITE_` variables to browser code.
 
 ## BaseScan
 
-The dashboard includes a BaseScan Publish panel for each token. It opens the
-public token page, Verify and Publish page, cross-chain verify view, Verify
-Address page, Token Info / Logo form, and provides a copy-ready publish pack
-with the token address, logo URL and metadata JSON. BaseScan header logos are
-not automatic from on-chain metadata, so creators should submit the Token Info /
-Logo request after saving logo + JSON on-chain.
+The dashboard includes a BaseScan Publish panel for each token. The Auto publish
+button runs server-side BaseScan API checks with `BASESCAN_API_KEY`, attempts the
+supported verification path, validates logo + metadata readiness, and copies a
+publish pack. BaseScan header logos are not automatic from on-chain metadata,
+so creators may still need BaseScan's logged-in Token Info / Logo review after
+saving logo + JSON on-chain.
 
 ## Security Notes
 

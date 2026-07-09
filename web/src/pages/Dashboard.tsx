@@ -1049,6 +1049,45 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
     "3. If BaseScan asks for ownership, use Verify Address from the dashboard.",
     "4. Paste this pack, upload the logo file if BaseScan asks, and submit for review.",
   ].filter(Boolean).join("\n");
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
+  const [publishResult, setPublishResult] = useState<{
+    ok: boolean;
+    steps: Array<{ key: string; status: "done" | "pending" | "blocked" | "manual"; title: string; detail: string }>;
+    publishPack: string;
+  } | null>(null);
+
+  async function autoPublish() {
+    setPublishing(true);
+    setPublishError("");
+    setPublishResult(null);
+    try {
+      const res = await fetch("/api/basescan-publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          address: token.address,
+          name: token.name,
+          symbol: token.symbol,
+          decimals: token.decimals,
+          logoURI: token.logoURI,
+          metadataURI,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `BaseScan publish failed (${res.status}).`);
+      setPublishResult(json);
+      try {
+        await navigator.clipboard.writeText(json.publishPack || publishPack);
+      } catch {
+        /* Clipboard can be blocked by the browser. The copy button remains available. */
+      }
+    } catch (error) {
+      setPublishError(error instanceof Error ? error.message : "BaseScan publish failed.");
+    } finally {
+      setPublishing(false);
+    }
+  }
 
   return (
     <SectionCard
@@ -1060,14 +1099,37 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
     >
       <div className="space-y-3">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          BaseScan logo is not automatic. Save logo + JSON in Metadata, then submit Token Info / Logo to BaseScan for review.
+          One click runs the BaseScan API checks from this app. BaseScan logo approval still depends on BaseScan review.
         </Callout>
-        <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
-          Copy the publish pack first. It contains the token address, logo URL and metadata JSON you need on BaseScan forms.
-        </Callout>
+        <Button fullWidth loading={publishing} disabled={publishing} onClick={autoPublish} className="gap-2">
+          <IconSparkles className="h-4 w-4" /> Auto publish
+        </Button>
+        {publishError && <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />}>{publishError}</Callout>}
+        {publishResult && (
+          <div className="space-y-2 rounded-xl border border-sky-200/70 bg-surface/75 p-3 dark:border-sky-400/20">
+            {publishResult.steps.map((step) => (
+              <div key={step.key} className="flex gap-3 rounded-lg border border-border bg-bg/70 p-3">
+                <span className={cn(
+                  "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border",
+                  step.status === "done" && "border-positive/30 bg-positive/10 text-positive",
+                  step.status === "pending" && "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200",
+                  step.status === "manual" && "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200",
+                  step.status === "blocked" && "border-negative/30 bg-negative/10 text-negative"
+                )}>
+                  {step.status === "done" ? <IconCheck className="h-3.5 w-3.5" /> : <IconInfo className="h-3.5 w-3.5" />}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-fg">{step.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted">{step.detail}</p>
+                </div>
+              </div>
+            ))}
+            <CopyButton value={publishResult.publishPack} label="Copy publish pack" className="w-full justify-center py-2.5" />
+          </div>
+        )}
         <div className="grid gap-2 sm:grid-cols-2">
           <a href={tokenPage} target="_blank" rel="noreferrer">
-            <Button fullWidth className="gap-2">
+            <Button variant="outline" fullWidth className="gap-2">
               Public token page <IconExternal className="h-4 w-4" />
             </Button>
           </a>
