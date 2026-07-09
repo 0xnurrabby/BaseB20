@@ -13,14 +13,22 @@ function link(path) {
   return `${BASESCAN}${path}`;
 }
 
-async function basescan(params) {
+async function basescan(params, method = "GET") {
   const key = process.env.BASESCAN_API_KEY?.trim();
   if (!key) throw new Error("BASESCAN_API_KEY is not configured.");
-  const url = new URL(API_URL);
-  url.searchParams.set("chainid", CHAIN_ID);
-  url.searchParams.set("apikey", key);
-  Object.entries(params).forEach(([name, value]) => url.searchParams.set(name, String(value)));
-  const res = await fetch(url);
+  const body = new URLSearchParams();
+  body.set("chainid", CHAIN_ID);
+  body.set("apikey", key);
+  Object.entries(params).forEach(([name, value]) => body.set(name, String(value)));
+
+  const url = method === "POST" ? API_URL : `${API_URL}?${body.toString()}`;
+  const res = await fetch(url, method === "POST"
+    ? {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+      }
+    : undefined);
   const json = await res.json().catch(() => null);
   if (!json) throw new Error(`BaseScan API returned ${res.status}.`);
   return json;
@@ -39,7 +47,7 @@ async function tryProxyVerification(address) {
     module: "contract",
     action: "verifyproxycontract",
     address,
-  });
+  }, "POST");
 
   if (submit.status !== "1") {
     return {
