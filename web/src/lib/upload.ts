@@ -1,13 +1,13 @@
 /**
- * Image upload via imgbb. Used by the token-logo picker: the user selects an
- * image from their device, we host it on imgbb and get back a stable URL that
- * gets stored on-chain as the token's logoURI.
+ * Image upload via the server-side IPFS pinning route. Used by the token-logo
+ * picker: the user selects an image from their device, we pin it and store the
+ * resulting ipfs:// URI on-chain as the token's logoURI.
  */
 
 export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
-/** Read a File as a base64 string (without the data: prefix), which imgbb expects. */
+/** Read a File as a base64 string without the data: prefix. */
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -22,11 +22,13 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export interface UploadResult {
-  url: string; // direct image URL
+  url: string;
+  gatewayUrl?: string;
+  pinataKey?: string;
   deleteUrl?: string;
 }
 
-/** Validate + upload an image file to imgbb. Throws with a friendly message on failure. */
+/** Validate and upload an image file. Throws with a friendly message on failure. */
 export async function uploadImage(file: File): Promise<UploadResult> {
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
     throw new Error("Unsupported file type. Use PNG, JPG, GIF or WEBP.");
@@ -54,6 +56,8 @@ export async function uploadImage(file: File): Promise<UploadResult> {
 
   const json = (await res.json().catch(() => ({}))) as {
     url?: string;
+    gatewayUrl?: string;
+    pinataKey?: string;
     deleteUrl?: string;
     error?: string;
   };
@@ -67,6 +71,8 @@ export async function uploadImage(file: File): Promise<UploadResult> {
 
   return {
     url: json.url,
+    gatewayUrl: json.gatewayUrl,
+    pinataKey: json.pinataKey,
     deleteUrl: json.deleteUrl,
   };
 }

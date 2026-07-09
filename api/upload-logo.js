@@ -1,59 +1,27 @@
-const ENDPOINT = "https://api.imgbb.com/1/upload";
+const { pinFileWithFallback } = require("./_pinata");
+const { readJson, send } = require("./_http");
+
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
-
-function send(res, status, body) {
-  res.statusCode = status;
-  res.setHeader("content-type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(body));
-}
-
-function readJson(req) {
-  return new Promise((resolve, reject) => {
-    let raw = "";
-    req.on("data", (chunk) => {
-      raw += chunk;
-      if (raw.length > MAX_IMAGE_BYTES * 2) {
-        reject(new Error("Payload is too large."));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      try {
-        resolve(JSON.parse(raw || "{}"));
-      } catch {
-        reject(new Error("Invalid JSON payload."));
-      }
-    });
-    req.on("error", reject);
-  });
-}
 
 function decodedBase64Bytes(value) {
   const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
   return Math.floor((value.length * 3) / 4) - padding;
 }
 
-function isDirectImageUrl(value) {
-  if (typeof value !== "string" || !value.trim()) return false;
-  try {
-    const url = new URL(value.trim());
-    const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
-    if (host === "ibb.co" || host === "www.ibb.co") return false;
-    return /\.(png|jpe?g|gif|webp)$/i.test(url.pathname);
-  } catch {
-    return false;
-  }
+function extensionFor(type) {
+  if (type === "image/jpeg") return "jpg";
+  if (type === "image/gif") return "gif";
+  if (type === "image/webp") return "webp";
+  return "png";
 }
 
-function pickDirectImageUrl(data) {
-  const candidates = [
-    data?.image?.url,
-    data?.display_url,
-    data?.url,
-  ];
-  return candidates.find(isDirectImageUrl) || "";
+function safeName(value) {
+  return String(value || "token-logo")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "token-logo";
 }
 
 module.exports = async function handler(req, res) {
@@ -62,20 +30,15 @@ module.exports = async function handler(req, res) {
     return send(res, 405, { error: "Method not allowed." });
   }
 
-  const key = process.env.IMGBB_API_KEY?.trim();
-  if (!key) {
-    return send(res, 500, { error: "Image upload is not configured." });
-  }
-
   let payload;
   try {
-    payload = await readJson(req);
+    payload = await readJson(req, MAX_IMAGE_BYTES * 2);
   } catch (error) {
     return send(res, 400, { error: error instanceof Error ? error.message : "Invalid upload payload." });
   }
 
   const image = typeof payload.image === "string" ? payload.image : "";
-  const name = typeof payload.name === "string" ? payload.name : "token-logo";
+  const name = safeName(payload.name);
   const type = typeof payload.type === "string" ? payload.type : "";
   const size = Number(payload.size ?? 0);
 
@@ -92,31 +55,19 @@ module.exports = async function handler(req, res) {
     return send(res, 400, { error: "Image is too large. Keep it under 3 MB." });
   }
 
-  const body = new FormData();
-  body.append("image", image);
-  body.append("name", name.replace(/\.[^.]+$/, "").slice(0, 60) || "token-logo");
-
-  let uploadRes;
   try {
-    uploadRes = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}`, { method: "POST", body });
-  } catch {
-    return send(res, 502, { error: "Upload failed. Check your connection and try again." });
-  }
-
-  if (!uploadRes.ok) {
-    return send(res, uploadRes.status >= 500 ? 502 : 400, {
-      error: `Upload failed (${uploadRes.status}). Try a different image.`,
+    const pinned = await pinFileWithFallback({
+      bytes: Buffer.from(image, "base64"),
+      type,
+      filename: `${name}.${extensionFor(type)}`,
+      name,
     });
+    return send(res, 200, {
+      url: `ipfs://${pinned.cid}`,
+      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.cid}`,
+      pinataKey: pinned.credentialLabel,
+    });
+  } catch (error) {
+    return send(res, 400, { error: error instanceof Error ? error.message : "IPFS image upload failed." });
   }
-
-  const json = await uploadRes.json();
-  const directUrl = pickDirectImageUrl(json?.data);
-  if (!json?.success || !directUrl) {
-    return send(res, 400, { error: json?.error?.message ?? "Upload failed. Try a different image." });
-  }
-
-  return send(res, 200, {
-    url: directUrl,
-    deleteUrl: json.data.delete_url,
-  });
 };

@@ -742,7 +742,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
         <Field
           label="Logo image"
           error={logoError}
-          hint="ImgBB upload saves Direct link automatically. If pasting manually, use i.ibb.co direct image link."
+          hint="Upload pins the image to IPFS. If pasting manually, use a direct https:// image link or ipfs:// URI."
         >
           <LogoPicker value={logoURI} onChange={setLogoURI} symbol={symbol || token.symbol} disabled={!canMetadata} />
           <div className="mt-3 flex gap-2">

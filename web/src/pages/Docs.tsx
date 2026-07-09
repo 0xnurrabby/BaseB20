@@ -243,7 +243,10 @@ const SECTIONS: Section[] = [
           For normal launches: choose a logo and press Create. The app pins image and token details to IPFS before wallet confirmation.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Do not paste ImgBB Viewer links like ibb.co/abc. Wallets need Direct links like i.ibb.co/folder/image.png.
+          If you paste a logo manually, use an ipfs:// URI or a direct image URL ending in PNG, JPG, GIF or WEBP. Viewer pages are not image files.
+        </Callout>
+        <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />} title="Site owner setup">
+          Add Pinata keys in Vercel as PINATA_JWT or as matching PINATA_API_KEY and PINATA_API_SECRET_KEY values. Multiple keys can be comma-separated for automatic fallback.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
           Some wallets, including Rabby, may reject direct automatic import until their indexer recognizes a new native

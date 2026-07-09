@@ -85,13 +85,33 @@ Frontend:
 
 Server:
 
-- `IMGBB_API_KEY`, server-side logo upload key
-- `PINATA_JWT`, server-side IPFS pinning token for launch metadata
+- `PINATA_JWT`, server-side Pinata JWT for image and metadata IPFS pinning
+- `PINATA_JWTS`, optional comma-separated extra Pinata JWTs for fallback
+- `PINATA_API_KEY` with `PINATA_API_SECRET_KEY`, optional Pinata API key mode
+- `PINATA_API`, optional comma-separated `apiKey:secretApiKey` pairs
 - `DATABASE_URL`, Neon connection string for analytics and admin stats
 - `ADMIN_ADDRESSES`, comma-separated wallet addresses allowed into `/admin`
 - `ANALYTICS_SALT`, optional salt for anonymous visitor hashing
 
 Do not use `VITE_` for secrets. Vite exposes `VITE_` variables to browser code.
+
+Pinata fallback examples:
+
+```bash
+PINATA_JWT=jwt_from_account_1,jwt_from_account_2,jwt_from_account_3
+```
+
+or:
+
+```bash
+PINATA_API_KEY=api_key_1,api_key_2,api_key_3
+PINATA_API_SECRET_KEY=secret_1,secret_2,secret_3
+```
+
+For each upload, the server tries key 1 first, then key 2, then key 3 if
+Pinata rejects the request because of quota, rate limit or a temporary error.
+The logo image and metadata JSON are pinned with the same working key so the
+token launch stays consistent.
 
 ## BaseScan
 
@@ -116,4 +136,4 @@ verification path, and validates logo + metadata readiness from inside the app.
 
 - Frontend: Vite, React 18, TypeScript, Tailwind CSS, wagmi, viem, TanStack
   Query and React Router.
-- Serverless: Vercel API routes for analytics, admin stats, ImgBB uploads and IPFS metadata pinning.
+- Serverless: Vercel API routes for analytics, admin stats and Pinata IPFS pinning.

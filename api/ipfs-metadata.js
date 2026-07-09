@@ -1,7 +1,6 @@
 const { readJson, send } = require("./_http");
+const { pinataCredentials, pinMetadataWithFallback } = require("./_pinata");
 
-const PIN_FILE_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";
-const PIN_JSON_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
@@ -24,52 +23,6 @@ function extensionFor(type) {
   if (type === "image/gif") return "gif";
   if (type === "image/webp") return "webp";
   return "png";
-}
-
-function assertPinataKey() {
-  const token = process.env.PINATA_JWT?.trim();
-  if (!token) throw new Error("IPFS upload is not configured. Add PINATA_JWT in Vercel env.");
-  return token;
-}
-
-async function pinFile({ bytes, type, filename, name }) {
-  const token = assertPinataKey();
-  const form = new FormData();
-  form.append("file", new Blob([bytes], { type }), filename);
-  form.append("pinataMetadata", JSON.stringify({ name }));
-  form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
-
-  const res = await fetch(PIN_FILE_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.IpfsHash) {
-    throw new Error(json.error?.details || json.error || `IPFS image upload failed (${res.status}).`);
-  }
-  return String(json.IpfsHash);
-}
-
-async function pinJson(content, name) {
-  const token = assertPinataKey();
-  const res = await fetch(PIN_JSON_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      pinataContent: content,
-      pinataMetadata: { name },
-      pinataOptions: { cidVersion: 1 },
-    }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.IpfsHash) {
-    throw new Error(json.error?.details || json.error || `IPFS metadata upload failed (${res.status}).`);
-  }
-  return String(json.IpfsHash);
 }
 
 async function imageFromPayload(payload, tokenName) {
@@ -126,18 +79,16 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    assertPinataKey();
+    pinataCredentials();
     const name = clean(payload.name, "B20 Token");
     const symbol = clean(payload.symbol, "B20", 24).toUpperCase();
     const image = await imageFromPayload(payload, safeName(name, "b20-token"));
-    const imageCid = image ? await pinFile({ ...image, name: `${symbol}-logo` }) : "";
-    const imageUri = imageCid ? `ipfs://${imageCid}` : clean(payload.imageUrl, "", 600);
     const metadata = {
       name,
       symbol,
       description: `${name} (${symbol}) is a native B20 token on Base.`,
-      image: imageUri,
-      logoURI: imageUri,
+      image: clean(payload.imageUrl, "", 600),
+      logoURI: clean(payload.imageUrl, "", 600),
       external_url: "https://base.nurlab.xyz",
       properties: {
         chain: "Base",
@@ -145,14 +96,19 @@ module.exports = async function handler(req, res) {
         type: "Asset",
       },
     };
-    const metadataCid = await pinJson(metadata, `${symbol}-metadata.json`);
+    const pinned = await pinMetadataWithFallback({
+      image: image ? { ...image, name: `${symbol}-logo` } : null,
+      metadata,
+      metadataName: `${symbol}-metadata.json`,
+    });
 
     return send(res, 200, {
-      contractURI: `ipfs://${metadataCid}`,
-      logoURI: imageUri,
-      imageURI: imageUri,
-      metadataGatewayUrl: `https://gateway.pinata.cloud/ipfs/${metadataCid}`,
-      imageGatewayUrl: imageCid ? `https://gateway.pinata.cloud/ipfs/${imageCid}` : "",
+      contractURI: `ipfs://${pinned.metadataCid}`,
+      logoURI: pinned.imageUri,
+      imageURI: pinned.imageUri,
+      metadataGatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.metadataCid}`,
+      imageGatewayUrl: pinned.imageCid ? `https://gateway.pinata.cloud/ipfs/${pinned.imageCid}` : "",
+      pinataKey: pinned.credentialLabel,
     });
   } catch (error) {
     return send(res, 400, { error: error instanceof Error ? error.message : "IPFS metadata upload failed." });

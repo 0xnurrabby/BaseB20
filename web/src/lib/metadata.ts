@@ -1,11 +1,11 @@
-import { isDirectImgBBImageUrl } from "./image-url";
+import { isLegacyDirectImageUrl } from "./image-url";
 
 const FALLBACK_ORIGIN = "https://base.nurlab.xyz";
 
 function buildMetadataImageUrl(image: string, base: string) {
   const clean = image.trim();
   if (!clean) return "";
-  if (!isDirectImgBBImageUrl(clean)) return clean;
+  if (!isLegacyDirectImageUrl(clean)) return clean;
 
   const url = new URL("/api/logo-image", base);
   url.searchParams.set("url", clean);

@@ -16,7 +16,7 @@ export function logoUrlError(value: string) {
 
   const host = url.hostname.toLowerCase();
   if (host === "ibb.co" || host === "www.ibb.co") {
-    return "Use ImgBB Direct link (i.ibb.co/...png), not Viewer link (ibb.co/...).";
+    return "Use a direct image link, not a viewer page link.";
   }
 
   return "";
@@ -29,7 +29,7 @@ export function ipfsGatewayUrl(value: string) {
   return `https://ipfs.io/ipfs/${path}`;
 }
 
-export function isDirectImgBBImageUrl(value: string) {
+export function isLegacyDirectImageUrl(value: string) {
   try {
     const url = new URL(value.trim());
     return url.protocol === "https:" && url.hostname.toLowerCase() === "i.ibb.co" && /\.(png|jpe?g|gif|webp)$/i.test(url.pathname);

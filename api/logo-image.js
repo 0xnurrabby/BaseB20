@@ -38,7 +38,7 @@ module.exports = async function handler(req, res) {
 
   const imageUrl = validateImageUrl(req.query.url);
   if (!imageUrl) {
-    return sendJson(res, 400, { error: "Use a direct i.ibb.co image URL." });
+    return sendJson(res, 400, { error: "Use a supported direct image URL." });
   }
 
   let upstream;
