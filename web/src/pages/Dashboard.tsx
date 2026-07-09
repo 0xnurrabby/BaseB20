@@ -380,7 +380,7 @@ export function Dashboard() {
       )}
 
       <Callout tone="positive" icon={<IconInfo className="h-4 w-4" />} title="Native B20 on Base mainnet">
-        No Solidity source upload is needed. If BaseScan shows a compiler warning under Contract Code, it is from BaseScan's matched implementation view, not your token settings.
+        Use the BaseScan Publish panel below after launch. It opens verification and token logo submission links with the token address ready.
       </Callout>
 
       <TxChainProvider chainId={targetChainId}>
@@ -1022,38 +1022,87 @@ function TransferPanel({ token, connected, refetch }: Ctx) {
 
 function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: SupportedChainId }) {
   const dashboardLink = typeof window !== "undefined" ? `${window.location.origin}/dashboard/${token.address}` : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://base.nurlab.xyz";
+  const baseScan = explorerUrl(chainId);
+  const tokenPage = `${baseScan}/token/${token.address}`;
+  const verifyPage = `${baseScan}/verifyContract?a=${token.address}`;
+  const crossChainVerifyPage = `${baseScan}/address/${token.address}#code`;
+  const verifyAddressPage = `${baseScan}/verifyaddress/`;
+  const tokenUpdatePage = `${baseScan}/tokenupdate/?a=${token.address}`;
+  const metadataURI = token.logoURI
+    ? buildTokenMetadataUri({ name: token.name, symbol: token.symbol, image: token.logoURI, origin })
+    : token.contractURI;
+  const publishPack = [
+    `Token name: ${token.name}`,
+    `Token symbol: ${token.symbol}`,
+    `Token contract: ${token.address}`,
+    `Decimals: ${token.decimals}`,
+    `Chain: Base mainnet`,
+    `BaseScan: ${tokenPage}`,
+    token.logoURI ? `Logo direct link: ${token.logoURI}` : "Logo direct link: not saved yet",
+    metadataURI ? `Metadata JSON: ${metadataURI}` : "Metadata JSON: not saved yet",
+    dashboardLink ? `Dashboard: ${dashboardLink}` : "",
+    "",
+    "BaseScan publish checklist:",
+    "1. Open Verify & Publish and try BaseScan's normal or cross-chain verify flow.",
+    "2. After the contract is accepted, open Token Info / Logo request.",
+    "3. If BaseScan asks for ownership, use Verify Address from the dashboard.",
+    "4. Paste this pack, upload the logo file if BaseScan asks, and submit for review.",
+  ].filter(Boolean).join("\n");
+
   return (
     <SectionCard
       icon={<IconExternal className="h-5 w-5" />}
-      title="BaseScan sharing"
-      desc="Open and share the public token page."
+      title="BaseScan Publish"
+      desc="Verify the token page and submit the logo to BaseScan."
       className={tones.picker.card}
       iconClassName={tones.picker.icon}
     >
       <div className="space-y-3">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Use the token page, holders and transfers tabs for sharing. You do not need to use the Contract Code tab for native B20.
-        </Callout>
-        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          BaseScan may show Similar Match, constructor, or compiler warnings for the matched implementation. That warning is not caused by your launch settings and does not mean your B20 token failed.
+          BaseScan logo is not automatic. Save logo + JSON in Metadata, then submit Token Info / Logo to BaseScan for review.
         </Callout>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
-          Share the token address or token page. For logo and socials, update metadata here and submit token info to explorer or wallet indexers if they require manual review.
+          Copy the publish pack first. It contains the token address, logo URL and metadata JSON you need on BaseScan forms.
         </Callout>
         <div className="grid gap-2 sm:grid-cols-2">
-          <a href={`${explorerUrl(chainId)}/token/${token.address}`} target="_blank" rel="noreferrer">
-            <Button variant="outline" fullWidth className="gap-2">
+          <a href={tokenPage} target="_blank" rel="noreferrer">
+            <Button fullWidth className="gap-2">
               Public token page <IconExternal className="h-4 w-4" />
             </Button>
           </a>
-          <a href={`${explorerUrl(chainId)}/address/${B20_FACTORY_ADDRESS}`} target="_blank" rel="noreferrer">
+          <a href={verifyPage} target="_blank" rel="noreferrer">
+            <Button variant="secondary" fullWidth className="gap-2">
+              Verify & Publish <IconExternal className="h-4 w-4" />
+            </Button>
+          </a>
+          <a href={crossChainVerifyPage} target="_blank" rel="noreferrer">
+            <Button variant="outline" fullWidth className="gap-2">
+              Cross-chain verify <IconExternal className="h-4 w-4" />
+            </Button>
+          </a>
+          <a href={verifyAddressPage} target="_blank" rel="noreferrer">
+            <Button variant="outline" fullWidth className="gap-2">
+              Verify address <IconExternal className="h-4 w-4" />
+            </Button>
+          </a>
+          <a href={tokenUpdatePage} target="_blank" rel="noreferrer">
+            <Button variant="outline" fullWidth className="gap-2">
+              Token Info / Logo <IconExternal className="h-4 w-4" />
+            </Button>
+          </a>
+          <a href={`${baseScan}/address/${B20_FACTORY_ADDRESS}`} target="_blank" rel="noreferrer">
             <Button variant="outline" fullWidth className="gap-2">
               B20 creator <IconExternal className="h-4 w-4" />
             </Button>
           </a>
           <AddToWalletButton token={token} variant="outline" />
-          <CopyButton value={token.address} label="Copy token address" className="justify-center py-2.5" />
+          <CopyButton value={publishPack} label="Copy publish pack" className="justify-center py-2.5" />
           {dashboardLink && <CopyButton value={dashboardLink} label="Copy dashboard link" className="justify-center py-2.5" />}
+        </div>
+        <div className="rounded-xl border border-sky-200/70 bg-surface/75 p-3 text-xs leading-relaxed text-muted dark:border-sky-400/20">
+          <p className="font-medium text-fg">BaseScan order</p>
+          <p className="mt-1">1. Save logo + JSON in Metadata. 2. Verify & Publish. 3. Verify address if asked. 4. Submit Token Info / Logo. BaseScan may take time to approve logo display.</p>
         </div>
       </div>
     </SectionCard>

@@ -94,12 +94,12 @@ Do not use `VITE_` for secrets. Vite exposes `VITE_` variables to browser code.
 
 ## BaseScan
 
-Native B20 tokens do not require user Solidity source verification. The user
-calls the Base B20 Factory precompile, and the token is created by Base's native
-implementation. The dashboard links to the BaseScan token page and factory page.
-If BaseScan shows Similar Match, constructor, or compiler warnings on the
-Contract Code tab, treat that as BaseScan's matched implementation view, not a
-failed B20 launch.
+The dashboard includes a BaseScan Publish panel for each token. It opens the
+public token page, Verify and Publish page, cross-chain verify view, Verify
+Address page, Token Info / Logo form, and provides a copy-ready publish pack
+with the token address, logo URL and metadata JSON. BaseScan header logos are
+not automatic from on-chain metadata, so creators should submit the Token Info /
+Logo request after saving logo + JSON on-chain.
 
 ## Security Notes
 

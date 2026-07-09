@@ -212,7 +212,7 @@ const SECTIONS: Section[] = [
           <li><b>Admin permissions.</b> Give permissions, remove permissions and lock final admin from the dashboard.</li>
           <li><b>Memo transfer.</b> Send normal token transfers with an optional bytes32 memo.</li>
           <li><b>Copy import info.</b> Copy address, symbol, decimals and logo URL for custom token import.</li>
-          <li><b>BaseScan sharing.</b> Open token, factory and share links from the dashboard without classic source verification.</li>
+          <li><b>BaseScan publish.</b> Open verify, token logo request and copy-ready publish info from the dashboard.</li>
         </Ol>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
           The dashboard no longer includes trade fees, DEX-pair registration, custom denylist controls, or
@@ -281,33 +281,24 @@ const SECTIONS: Section[] = [
   },
   {
     id: "publish",
-    title: "BaseScan Sharing",
-    eyebrow: "Public Page",
-    summary: "Native B20 tokens do not require user Solidity source verification.",
+    title: "BaseScan Publish",
+    eyebrow: "Verify & Logo",
+    summary: "Use the dashboard publish panel to open BaseScan verification and token logo submission.",
     tone: "lime",
     icon: <IconExternal className="h-5 w-5" />,
     body: (
       <>
         <P>
-          A classic contract deployment uploads bytecode from the user wallet and then verifies Solidity source on an
-          explorer. Native B20 is different. The user calls the B20 Factory precompile, and the token is created by
-          Base's native implementation.
-        </P>
-        <P>
-          For users, the correct sharing path is to open the token page on BaseScan and share the token address. The
-          dashboard links directly to the token page and the factory page.
+          BaseScan can still show Verify and Publish on the Contract tab. Use the dashboard BaseScan Publish panel
+          after launch. It opens the token page, verification page, cross-chain verify view, Verify Address and Token Info / Logo form.
         </P>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          If BaseScan's Contract Code tab shows a Similar Match, constructor, or compiler warning, do not treat it as a failed launch.
-          Native B20 tokens use Base's shared implementation, so the token page, holders, transfers and info tabs are
-          the right public view.
+          Recommended order: save logo + JSON in Metadata, copy the publish pack, run Verify and Publish, verify the
+          address if BaseScan asks, then submit Token Info / Logo.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          That warning is from BaseScan's matched implementation view. It is not caused by your launch form choices.
-        </Callout>
-        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Wallet and explorer logos may be cached by external indexers. Save logo image and Metadata JSON on-chain, then
-          submit token info to the explorer or wallet indexer if they require manual review.
+          BaseScan header logo is not automatic from on-chain metadata. BaseScan requires a Token Info / Logo request,
+          and approval can take time after submission.
         </Callout>
       </>
     ),
