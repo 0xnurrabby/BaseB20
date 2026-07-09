@@ -12,6 +12,7 @@ export interface TxRequest {
   functionName: string;
   args?: readonly unknown[];
   value?: bigint;
+  gas?: bigint;
 }
 
 const TxChainContext = createContext<SupportedChainId | undefined>(undefined);
@@ -87,7 +88,12 @@ export function TxButton({
         await switchChainAsync({ chainId: targetChainId });
       }
       setTxChainId(targetChainId);
-      writeContract({ ...req, chainId: targetChainId } as Parameters<typeof writeContract>[0]);
+      writeContract({
+        ...req,
+        chainId: targetChainId,
+        gas: req.gas ?? defaultGasLimit(req),
+        ...(req.value !== undefined ? { value: req.value } : {}),
+      } as unknown as Parameters<typeof writeContract>[0]);
     } catch (switchError) {
       const message = switchError instanceof Error ? switchError.message : "Network switch failed.";
       setLocalError(
@@ -128,4 +134,21 @@ export function TxButton({
       {friendlyError && <p className="mt-1.5 text-xs text-negative">{friendlyError}</p>}
     </div>
   );
+}
+
+function defaultGasLimit(req: TxRequest) {
+  if (req.functionName === "createB20") return 6_000_000n;
+  if (req.functionName === "batchMint") {
+    const recipients = Array.isArray(req.args?.[0]) ? (req.args[0] as unknown[]).length : 1;
+    return BigInt(Math.min(6_000_000, 900_000 + recipients * 120_000));
+  }
+  if (req.functionName === "mint" || req.functionName === "mintWithMemo") return 650_000n;
+  if (req.functionName === "burn" || req.functionName === "burnWithMemo") return 550_000n;
+  if (req.functionName === "transfer" || req.functionName === "transferWithMemo") return 450_000n;
+  if (req.functionName === "updateName" || req.functionName === "updateSymbol" || req.functionName === "updateSupplyCap") return 500_000n;
+  if (req.functionName === "updateContractURI" || req.functionName === "updateExtraMetadata") return 650_000n;
+  if (req.functionName === "grantRole" || req.functionName === "revokeRole") return 450_000n;
+  if (req.functionName === "renounceRole" || req.functionName === "renounceLastAdmin") return 450_000n;
+  if (req.functionName === "pause" || req.functionName === "unpause") return 450_000n;
+  return 500_000n;
 }

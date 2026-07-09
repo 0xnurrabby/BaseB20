@@ -10,12 +10,11 @@ import {
   MAX_UINT128,
   PAUSABLE_FEATURES,
   ROLE_OPTIONS,
-  WAD_PRECISION,
   isNoCap,
 } from "../lib/contract";
 import { DEFAULT_CHAIN_ID, chainName, explorerUrl, getTargetChainId, isSupportedChain, type SupportedChainId } from "../lib/wagmi";
 import { getSavedTokens, removeToken, saveToken, type SavedToken } from "../lib/storage";
-import { formatAmount, formatFull, isAddressLike, shortAddress } from "../lib/format";
+import { formatAmount, isAddressLike, shortAddress } from "../lib/format";
 import { Badge, Button, Callout, Card, CopyButton, Field, Input, SectionCard, Textarea, cn } from "../components/ui";
 import { TxButton, TxChainProvider } from "../components/TxButton";
 import { WalletConnect } from "../components/WalletConnect";
@@ -32,7 +31,6 @@ import {
   IconPause,
   IconPlay,
   IconPlus,
-  IconRocket,
   IconSend,
   IconShield,
   IconSparkles,
@@ -41,6 +39,7 @@ import {
 } from "../components/icons";
 import { TokenLogo } from "../components/TokenLogo";
 import { AddToWalletButton } from "../components/AddToWalletButton";
+import { LogoPicker } from "../components/LogoPicker";
 import { buildTokenMetadataUri } from "../lib/metadata";
 
 type RoleKey = keyof typeof B20_ROLES;
@@ -55,7 +54,6 @@ interface TokenView {
   supplyCap: bigint;
   contractURI: string;
   logoURI: string;
-  multiplier: bigint;
   balance: bigint;
   roles: Record<RoleKey, boolean>;
   paused: Record<"transfer" | "mint" | "burn", boolean>;
@@ -106,9 +104,13 @@ const ROLE_HELP: Record<RoleKey, string> = {
   BURN_BLOCKED_ROLE: "Advanced role for policy-blocked account burn flows.",
   PAUSE_ROLE: "Can pause transfers, minting or burning during emergencies.",
   UNPAUSE_ROLE: "Can turn paused features back on.",
-  METADATA_ROLE: "Can update name, symbol, metadata URL and logo image URL.",
+  METADATA_ROLE: "Can update name, symbol, metadata JSON link and logo image link.",
   OPERATOR_ROLE: "Advanced role. Most tokens should leave this unused.",
 };
+
+const VISIBLE_ROLE_OPTIONS = ROLE_OPTIONS.filter(
+  (role) => role.key !== "BURN_BLOCKED_ROLE" && role.key !== "OPERATOR_ROLE"
+);
 
 export function Dashboard() {
   const { address: routeAddress } = useParams();
@@ -140,7 +142,6 @@ export function Dashboard() {
       { chainId: targetChainId, address: selected, abi: B20_ABI, functionName: "supplyCap" },
       { chainId: targetChainId, address: selected, abi: B20_ABI, functionName: "contractURI" },
       { chainId: targetChainId, address: selected, abi: B20_ABI, functionName: "extraMetadata", args: ["logoURI"] },
-      { chainId: targetChainId, address: selected, abi: B20_ABI, functionName: "multiplier" },
       { chainId: targetChainId, address: selected, abi: B20_ABI, functionName: "balanceOf", args: [account] },
       ...roleEntries.map(([, role]) => ({
         chainId: targetChainId,
@@ -166,14 +167,14 @@ export function Dashboard() {
   });
 
   const token = useMemo<TokenView | null>(() => {
-    if (!selected || !data || data.length < 10 + roleEntries.length + PAUSABLE_FEATURES.length) return null;
+    if (!selected || !data || data.length < 9 + roleEntries.length + PAUSABLE_FEATURES.length) return null;
     const result = (i: number) => data[i]?.result;
     if (data[1]?.status !== "success") return null;
     const roles = {} as Record<RoleKey, boolean>;
     roleEntries.forEach(([key], i) => {
-      roles[key] = Boolean(result(10 + i));
+      roles[key] = Boolean(result(9 + i));
     });
-    const pauseBase = 10 + roleEntries.length;
+    const pauseBase = 9 + roleEntries.length;
     return {
       address: selected,
       factoryInitialized: Boolean(result(0)),
@@ -184,8 +185,7 @@ export function Dashboard() {
       supplyCap: (result(5) as bigint) ?? MAX_UINT128,
       contractURI: String(result(6) ?? ""),
       logoURI: String(result(7) ?? ""),
-      multiplier: (result(8) as bigint) ?? WAD_PRECISION,
-      balance: (result(9) as bigint) ?? 0n,
+      balance: (result(8) as bigint) ?? 0n,
       roles,
       paused: {
         transfer: Boolean(result(pauseBase)),
@@ -322,7 +322,7 @@ export function Dashboard() {
   const visibleToken = token.logoURI || !savedToken?.logoURI ? token : { ...token, logoURI: savedToken.logoURI };
   const dashboardLink = typeof window !== "undefined" ? `${window.location.origin}/dashboard/${visibleToken.address}` : "";
   const ctx: Ctx = { token: visibleToken, chainId: targetChainId, connected, refetch };
-  const roleBadges = ROLE_OPTIONS.filter((r) => visibleToken.roles[r.key as RoleKey]).map((r) => r.label);
+  const roleBadges = VISIBLE_ROLE_OPTIONS.filter((r) => visibleToken.roles[r.key as RoleKey]).map((r) => r.label);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
@@ -383,7 +383,7 @@ export function Dashboard() {
       </Callout>
 
       <TxChainProvider chainId={targetChainId}>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
           <MintPanel {...ctx} />
           <BurnPanel {...ctx} />
           <SupplyCapPanel {...ctx} />
@@ -391,7 +391,6 @@ export function Dashboard() {
           <MetadataPanel {...ctx} />
           <RolesPanel {...ctx} />
           <TransferPanel {...ctx} />
-          <OperatorPanel {...ctx} />
           <BaseScanPanel token={visibleToken} chainId={targetChainId} />
         </div>
       </TxChainProvider>
@@ -672,8 +671,6 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
   const [symbol, setSymbol] = useState(token.symbol);
   const [contractURI, setContractURI] = useState(token.contractURI);
   const [logoURI, setLogoURI] = useState(token.logoURI);
-  const [metaKey, setMetaKey] = useState("");
-  const [metaValue, setMetaValue] = useState("");
 
   useEffect(() => {
     setName(token.name);
@@ -690,13 +687,13 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     <SectionCard
       icon={<IconSparkles className="h-5 w-5" />}
       title="Metadata"
-      desc="Update the token name, symbol, metadata URL and logo image."
+      desc="Update the token name, symbol, metadata JSON and logo image."
       className={tones.meta.card}
       iconClassName={tones.meta.icon}
     >
       <div className="space-y-4">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Metadata URL is a JSON link for wallets and explorers. Logo URI is the direct image link. The app shows it immediately, while external wallets may take time to index it.
+          Upload or paste a logo image link, save it on-chain, then use the generated metadata JSON link.
         </Callout>
         {!canMetadata && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Connected wallet does not hold METADATA_ROLE.</Callout>}
         <div className="flex items-center gap-3 rounded-xl border border-violet-200/70 bg-surface/75 px-4 py-3 dark:border-violet-400/20">
@@ -704,7 +701,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
           <div className="min-w-0">
             <p className="text-sm font-medium">Logo preview</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              Save the logo URI on-chain, then use Add to wallet from the token header to pass the image to supported wallets.
+              Save the logo image on-chain so this dashboard, metadata JSON and explorers can read it.
             </p>
           </div>
         </div>
@@ -722,7 +719,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
             </div>
           </Field>
         </div>
-        <Field label="Metadata URL" hint="Use https:// or ipfs://. The logo helper can fill this for you.">
+        <Field label="Metadata JSON link" hint="Use the generated JSON after the logo image is saved. Manual link is optional.">
           <div className="flex gap-2">
             <Input value={contractURI} onChange={(e) => setContractURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
             <TxButton variant="secondary" disabled={!canMetadata || contractURI === token.contractURI} build={() => ({ address: token.address, abi: B20_ABI, functionName: "updateContractURI", args: [contractURI.trim()] })} onSuccess={refetch}>Save</TxButton>
@@ -731,7 +728,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
         {suggestedContractURI && (
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="secondary" disabled={!canMetadata} onClick={() => setContractURI(suggestedContractURI)}>
-              Use logo metadata
+              Use generated JSON
             </Button>
             <a href={suggestedContractURI} target="_blank" rel="noreferrer">
               <Button type="button" size="sm" variant="outline">
@@ -740,8 +737,9 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
             </a>
           </div>
         )}
-        <Field label="Logo URI" hint="Direct PNG, JPG, WEBP or IPFS image link.">
-          <div className="flex gap-2">
+        <Field label="Logo image" hint="Upload from your device or paste a direct PNG, JPG, WEBP or IPFS image link.">
+          <LogoPicker value={logoURI} onChange={setLogoURI} symbol={symbol || token.symbol} disabled={!canMetadata} />
+          <div className="mt-3 flex gap-2">
             <Input value={logoURI} onChange={(e) => setLogoURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
             <TxButton
               variant="secondary"
@@ -752,17 +750,10 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
                 refetch();
               }}
             >
-              Save
+              Save on-chain
             </TxButton>
           </div>
         </Field>
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-[160px_1fr_auto]">
-          <Input value={metaKey} onChange={(e) => setMetaKey(e.target.value.trim())} placeholder="key" disabled={!canMetadata} />
-          <Input value={metaValue} onChange={(e) => setMetaValue(e.target.value)} placeholder="value, empty removes" disabled={!canMetadata} />
-          <TxButton variant="outline" disabled={!canMetadata || !metaKey} build={() => ({ address: token.address, abi: B20_ABI, functionName: "updateExtraMetadata", args: [metaKey, metaValue] })} onSuccess={() => { setMetaKey(""); setMetaValue(""); refetch(); }}>
-            Set key
-          </TxButton>
-        </div>
       </div>
     </SectionCard>
   );
@@ -799,14 +790,14 @@ function RolesPanel({ token, connected, refetch }: Ctx) {
               disabled={!isAdmin}
               className="w-full rounded-xl border border-border bg-bg px-3.5 py-2.5 text-sm text-fg transition focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-60"
             >
-              {ROLE_OPTIONS.map((option) => (
+              {VISIBLE_ROLE_OPTIONS.map((option) => (
                 <option key={option.key} value={option.key}>{option.label}</option>
               ))}
             </select>
           </Field>
         </div>
         <div className="rounded-xl border border-rose-200/70 bg-surface/70 px-4 py-3 text-xs leading-relaxed text-muted dark:border-rose-400/20">
-          <strong className="text-fg">{ROLE_OPTIONS.find((option) => option.key === roleKey)?.label}</strong>: {ROLE_HELP[roleKey]}
+          <strong className="text-fg">{VISIBLE_ROLE_OPTIONS.find((option) => option.key === roleKey)?.label}</strong>: {ROLE_HELP[roleKey]}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <TxButton disabled={!isAdmin || !validAccount} build={() => ({ address: token.address, abi: B20_ABI, functionName: "grantRole", args: [role, account as `0x${string}`] })} onSuccess={refetch}>
@@ -889,43 +880,6 @@ function TransferPanel({ token, connected, refetch }: Ctx) {
             <IconSend className="h-4 w-4" /> Send with memo
           </TxButton>
         </div>
-      </div>
-    </SectionCard>
-  );
-}
-
-function OperatorPanel({ token, refetch }: Ctx) {
-  const canOperate = token.roles.OPERATOR_ROLE;
-  const [multiplier, setMultiplier] = useState(formatUnits(token.multiplier, 18));
-  useEffect(() => setMultiplier(formatUnits(token.multiplier, 18)), [token.address, token.multiplier]);
-  const parsed = parseTokenAmount(multiplier, 18);
-  const valid = parsed !== null && parsed > 0n;
-
-  return (
-    <SectionCard
-      icon={<IconRocket className="h-5 w-5" />}
-      title="Advanced operator"
-      desc="Most tokens should keep this unchanged."
-      className={tones.ops.card}
-      iconClassName={tones.ops.icon}
-    >
-      <div className="space-y-4">
-        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Advanced control. Keep this at 1.0 unless you fully understand the effect, because changing it can confuse displayed balances.
-        </Callout>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Metric label="Current multiplier" value={formatFull(token.multiplier, 18)} />
-          <Metric label="Precision" value="1e18 WAD" />
-        </div>
-        <Field label="New multiplier" hint="1.0 keeps balances unchanged. 1.05 scales the view by 5%.">
-          <Input inputMode="decimal" value={multiplier} onChange={(e) => setMultiplier(cleanDecimal(e.target.value))} disabled={!canOperate} />
-        </Field>
-        <Button type="button" size="sm" variant="outline" disabled={!canOperate} onClick={() => setMultiplier("1")}>
-          Reset to 1.0
-        </Button>
-        <TxButton fullWidth disabled={!canOperate || !valid || parsed === token.multiplier} build={() => parsed ? { address: token.address, abi: B20_ABI, functionName: "updateMultiplier", args: [parsed] } : null} onSuccess={refetch}>
-          Update multiplier
-        </TxButton>
       </div>
     </SectionCard>
   );

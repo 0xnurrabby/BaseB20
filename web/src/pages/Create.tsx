@@ -37,7 +37,6 @@ import {
   IconCoins,
   IconExternal,
   IconGauge,
-  IconInfo,
   IconRocket,
   IconSettings,
   IconShield,
@@ -197,6 +196,8 @@ export function Create() {
       abi: B20_FACTORY_ABI,
       functionName: "createB20",
       args: [B20_VARIANT_ASSET, salt, params, initCalls],
+      value: 0n,
+      gas: 6_000_000n,
     });
   }
 
@@ -304,7 +305,7 @@ export function Create() {
               <Field label="Initial supply" error={err("supply", errors.supply)} hint={supplyRaw && supplyRaw > 0n ? `${commafy(f.supply)} tokens` : "Minted to your wallet"}>
                 <Input inputMode="decimal" value={f.supply} onChange={(e) => set("supply", cleanDecimal(e.target.value))} placeholder="1000000" />
               </Field>
-              <Field label="Decimals" error={err("decimals", errors.decimals)} hint="B20 Asset allows 6-18">
+              <Field label="Decimals" error={err("decimals", errors.decimals)} hint="Allowed: 6 to 18">
                 <Input inputMode="numeric" value={f.decimals} onChange={(e) => set("decimals", e.target.value.replace(/[^\d]/g, ""))} placeholder="18" />
               </Field>
               <div className="sm:col-span-2">
@@ -318,7 +319,7 @@ export function Create() {
           <SectionCard
             icon={<IconSettings className="h-5 w-5" />}
             title="Launch settings"
-            desc="Choose cap and admin powers before launch."
+            desc="Cap and optional controls."
             className={panel.standard.card}
             iconClassName={panel.standard.icon}
           >
@@ -326,7 +327,7 @@ export function Create() {
               <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-surface/80 px-4 py-3 dark:border-emerald-400/20 dark:bg-surface/70">
                 <div>
                   <p className="text-sm font-medium">Supply cap</p>
-                  <p className="text-xs text-muted">Maximum supply allowed after launch.</p>
+                  <p className="text-xs text-muted">Maximum supply after launch.</p>
                 </div>
                 <Switch checked={f.capEnabled} onChange={(v) => set("capEnabled", v)} label="Cap supply" />
               </div>
@@ -335,21 +336,15 @@ export function Create() {
                   <Input inputMode="decimal" value={f.supplyCap} onChange={(e) => set("supplyCap", cleanDecimal(e.target.value))} placeholder="1000000" />
                 </Field>
               )}
-              <Field label="Metadata URL" error={err("contractURI", errors.contractURI)} hint="Optional. Logo upload auto adds this if blank.">
-                <Input value={f.contractURI} onChange={(e) => set("contractURI", e.target.value.trim())} placeholder="ipfs://... or https://..." />
-              </Field>
-
               <div className="grid gap-3 sm:grid-cols-2">
-                <RoleToggle title="Minter role" desc="Allows minting after launch." checked={f.grantMinter} onChange={(v) => set("grantMinter", v)} />
-                <RoleToggle title="Burn role" desc="Allows your wallet to burn its own tokens." checked={f.grantBurner} onChange={(v) => set("grantBurner", v)} />
-                <RoleToggle title="Pause roles" desc="Allows pausing and unpausing transfers, minting or burning." checked={f.grantPauser} onChange={(v) => set("grantPauser", v)} />
-                <RoleToggle title="Metadata role" desc="Allows updating name, symbol and metadata URL." checked={f.grantMetadata} onChange={(v) => set("grantMetadata", v)} />
-                <RoleToggle title="Operator role" desc="Advanced. Most launches can leave this off." checked={f.grantOperator} onChange={(v) => set("grantOperator", v)} />
+                <RoleToggle title="Minter role" desc="Mint more supply later." checked={f.grantMinter} onChange={(v) => set("grantMinter", v)} />
+                <RoleToggle title="Burn role" desc="Use burn controls later." checked={f.grantBurner} onChange={(v) => set("grantBurner", v)} />
+                <RoleToggle title="Pause roles" desc="Emergency pause controls." checked={f.grantPauser} onChange={(v) => set("grantPauser", v)} />
+                <RoleToggle title="Metadata role" desc="Update name, symbol and logo." checked={f.grantMetadata} onChange={(v) => set("grantMetadata", v)} />
               </div>
 
               <Callout tone="neutral" icon={<IconShield className="h-4 w-4" />}>
-                Your connected wallet becomes the initial <strong className="text-fg">DEFAULT_ADMIN_ROLE</strong> holder.
-                You can renounce the last admin from the dashboard when the token should become admin-less.
+                Your connected wallet becomes the first admin. You can remove admin powers later from the dashboard.
               </Callout>
             </div>
           </SectionCard>
@@ -389,12 +384,6 @@ export function Create() {
             {hasErrors && isConnected && supported && <p className="mt-2 text-center text-xs text-negative">Fix the highlighted fields to continue.</p>}
             {networkError && <p className="mt-2 text-center text-xs text-negative">{networkError}</p>}
             {error && <p className="mt-2 text-center text-xs text-negative">{friendlyCreateError()}</p>}
-            <div className="mt-3">
-              <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />} title="Wallet simulation tip">
-                If Rabby shows node service unavailable or fail to estimate gas, first make sure the wallet is on Base.
-                Then retry after a moment. The app validates cap, decimals and roles before sending.
-              </Callout>
-            </div>
           </div>
         </div>
       </div>

@@ -40,9 +40,9 @@ Official references:
 - Name, symbol, initial supply and immutable Asset decimals
 - Asset decimals validation from 6 to 18
 - Supply cap with uint128 max as the no-cap sentinel
-- Logo URI stored as Asset `extraMetadata("logoURI")`
-- Optional `contractURI`
-- Bootstrap role grants for mint, pause, metadata and operator access
+- Logo image upload, then stored as Asset `extraMetadata("logoURI")`
+- Generated metadata JSON link for the token `contractURI`
+- Bootstrap role grants for mint, burn, pause and metadata controls
 - Initial supply minted during the factory creation transaction
 
 **Dashboard**
@@ -52,11 +52,11 @@ Official references:
 - Single mint and batch mint through native B20 methods
 - Supply cap update
 - Granular pause for transfer, mint and burn features
-- Metadata updates for name, symbol, contractURI and extra metadata
+- Metadata updates for name, symbol, metadata JSON and logo image
 - Role grant, revoke and renounce controls
 - `renounceLastAdmin()` path for a permanent admin-less token
 - Transfer with bytes32 memo
-- BaseScan token and factory links
+- Copy import info plus BaseScan token and factory links
 
 ## Quick Start
 
@@ -105,7 +105,7 @@ implementation. The dashboard links to the BaseScan token page and factory page.
   shape before sending the factory call.
 - Minting always respects the native B20 supply cap.
 - Role grants are visible on-chain. Treat DEFAULT_ADMIN_ROLE, MINT_ROLE,
-  PAUSE_ROLE, UNPAUSE_ROLE, METADATA_ROLE and OPERATOR_ROLE as real admin power.
+  BURN_ROLE, PAUSE_ROLE, UNPAUSE_ROLE and METADATA_ROLE as real admin power.
 - `renounceLastAdmin()` is permanent. Use it only when no future admin changes
   are needed.
 - The app follows the documented B20 surfaces, but it is not a legal, financial

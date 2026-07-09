@@ -13,11 +13,13 @@ export function LogoPicker({
   onChange,
   symbol,
   error,
+  disabled,
 }: {
   value: string;
   onChange: (url: string) => void;
   symbol: string;
   error?: string;
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "done">("idle");
@@ -51,12 +53,12 @@ export function LogoPicker({
   }
 
   function openPicker() {
-    if (status === "uploading") return;
+    if (disabled || status === "uploading") return;
     inputRef.current?.click();
   }
 
   async function saveImage() {
-    if (!selectedFile) return;
+    if (!selectedFile || disabled) return;
     setUploadError(null);
     setStatus("uploading");
     try {
@@ -74,6 +76,7 @@ export function LogoPicker({
   }
 
   function clearImage() {
+    if (disabled) return;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setSelectedFile(null);
@@ -117,7 +120,7 @@ export function LogoPicker({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={openPicker} loading={status === "uploading"}>
+            <Button type="button" size="sm" variant="secondary" onClick={openPicker} loading={status === "uploading"} disabled={disabled}>
               {selectedFile || value ? "Change image" : "Choose image"}
             </Button>
             <Button
@@ -125,11 +128,11 @@ export function LogoPicker({
               size="sm"
               onClick={saveImage}
               loading={status === "uploading"}
-              disabled={!selectedFile || status === "uploading"}
+              disabled={disabled || !selectedFile || status === "uploading"}
             >
               Save
             </Button>
-            {(selectedFile || value) && status !== "uploading" && (
+            {(selectedFile || value) && status !== "uploading" && !disabled && (
               <button
                 type="button"
                 onClick={clearImage}

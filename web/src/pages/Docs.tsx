@@ -76,7 +76,7 @@ const toneStyles: Record<Tone, { card: string; badge: string; icon: string; rule
 
 const quickLinks = [
   { title: "Create", copy: "Launch a native B20 Asset token on Base mainnet.", icon: <IconRocket className="h-5 w-5" />, to: "/create", tone: "sky" as Tone },
-  { title: "Manage", copy: "Mint, pause, update metadata and manage roles.", icon: <IconGauge className="h-5 w-5" />, to: "/dashboard", tone: "mint" as Tone },
+  { title: "Manage", copy: "Mint, burn, update logo and manage roles.", icon: <IconGauge className="h-5 w-5" />, to: "/dashboard", tone: "mint" as Tone },
   { title: "Base docs", copy: "Official launch guide and standard reference.", icon: <IconExternal className="h-5 w-5" />, to: "https://docs.base.org/get-started/launch-b20-token", tone: "amber" as Tone },
   { title: "Safety", copy: "Understand admin powers before renouncing roles.", icon: <IconShield className="h-5 w-5" />, to: "#security", tone: "rose" as Tone },
 ];
@@ -155,11 +155,11 @@ const SECTIONS: Section[] = [
             ["Salt", "Randomized per launch for deterministic B20 address derivation"],
             ["Initial admin", "Connected wallet receives DEFAULT_ADMIN_ROLE"],
             ["Supply cap", `Maximum allowed cap is ${MAX_UINT128.toString()}`],
-            ["Initial supply", "Minted during bootstrap after cap and roles are configured"],
+            ["Initial supply", "Created during launch after cap and roles are configured"],
           ]}
         />
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Factory initCalls run during token creation. They can configure cap, roles, metadata and the bootstrap mint
+          Factory initCalls run during token creation. They can configure cap, roles, metadata and the first mint
           atomically, while B20 invariants such as supply cap still apply.
         </Callout>
       </>
@@ -179,13 +179,15 @@ const SECTIONS: Section[] = [
             ["DEFAULT_ADMIN_ROLE", "Grants and revokes roles, updates supply cap and policies"],
             ["MINT_ROLE", "Can mint and mintWithMemo"],
             ["BURN_ROLE", "Can burn and burnWithMemo from its own balance"],
-            ["BURN_BLOCKED_ROLE", "Can burnBlocked from policy-blocked accounts"],
             ["PAUSE_ROLE", "Can pause selected features"],
             ["UNPAUSE_ROLE", "Can unpause selected features"],
-            ["METADATA_ROLE", "Can update name, symbol, contractURI and Asset extra metadata"],
-            ["OPERATOR_ROLE", "Asset role for multiplier updates and announcements"],
+            ["METADATA_ROLE", "Can update name, symbol, metadata JSON link and logo image link"],
           ]}
         />
+        <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
+          B20 also has advanced roles such as BURN_BLOCKED_ROLE and OPERATOR_ROLE. The dashboard hides them from the
+          normal role picker because most public tokens do not need those controls.
+        </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />} title="Last admin rule">
           The final DEFAULT_ADMIN_ROLE holder cannot be removed with normal revoke or renounceRole. B20 uses
           <Code>renounceLastAdmin()</Code> for the permanent admin-less transition.
@@ -207,15 +209,43 @@ const SECTIONS: Section[] = [
           <li><b>Supply cap.</b> Requires DEFAULT_ADMIN_ROLE. It can move up or down, but not below totalSupply.</li>
           <li><b>Burn.</b> Requires BURN_ROLE, removes tokens from the connected wallet, and lowers totalSupply permanently.</li>
           <li><b>Pause features.</b> Transfers, minting and burning are independently pausable.</li>
-          <li><b>Metadata.</b> Update name, symbol, contractURI and Asset extraMetadata such as logoURI.</li>
+          <li><b>Metadata.</b> Update name, symbol, metadata JSON link and logo image link.</li>
           <li><b>Roles.</b> Grant, revoke and renounce built-in roles from the dashboard.</li>
           <li><b>Memo transfer.</b> Send normal token transfers with an optional bytes32 memo.</li>
-          <li><b>Add to wallet.</b> Import the token into supported wallets with address, symbol, decimals and logo image.</li>
+          <li><b>Copy import info.</b> Copy address, symbol, decimals and logo URL for custom token import.</li>
           <li><b>BaseScan publish.</b> Open token, factory and share links from the dashboard without classic source verification.</li>
         </Ol>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
           The dashboard no longer includes trade fees, DEX-pair registration, custom denylist controls, or
           Solidity source verification. Those were from the old custom contract path and are not native B20 features.
+        </Callout>
+      </>
+    ),
+  },
+  {
+    id: "metadata",
+    title: "Logo And Metadata",
+    eyebrow: "Where Values Come From",
+    summary: "Metadata JSON and logo image links are usually created by the app after image upload.",
+    tone: "violet",
+    icon: <IconSparkles className="h-5 w-5" />,
+    body: (
+      <>
+        <InfoGrid
+          rows={[
+            ["Logo image", "Direct image link created after upload, usually an ImgBB URL"],
+            ["Metadata JSON", "JSON link for wallets and explorers. Click Use generated JSON after saving the logo image"],
+            ["Manual metadata", "Only needed if you already host your own JSON on IPFS or HTTPS"],
+            ["Custom key/value", "Advanced B20 extraMetadata. Hidden from the normal dashboard because most tokens do not need it"],
+            ["Wallet import", "Use Copy import info, then paste the token address in your wallet custom-token screen"],
+          ]}
+        />
+        <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
+          For normal launches: upload logo, save the logo image on-chain, click Use generated JSON, then save Metadata JSON.
+        </Callout>
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
+          Some wallets, including Rabby, may reject direct automatic import until their indexer recognizes a new native
+          B20 token. This app copies the import details instead of opening a wallet popup that can fail.
         </Callout>
       </>
     ),
@@ -268,8 +298,8 @@ const SECTIONS: Section[] = [
           the right public view.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          Wallet and explorer logos may be cached by external indexers. Save logoURI on-chain, use Add to wallet where
-          supported, and submit token info to the explorer or wallet indexer if they require manual review.
+          Wallet and explorer logos may be cached by external indexers. Save logo image and Metadata JSON on-chain, then
+          submit token info to the explorer or wallet indexer if they require manual review.
         </Callout>
       </>
     ),
@@ -288,8 +318,8 @@ const SECTIONS: Section[] = [
           <li>Grant MINT_ROLE only while minting is required.</li>
           <li>Keep supply cap at or above planned maximum supply.</li>
           <li>Grant pause roles only to wallets that should handle emergencies.</li>
-          <li>Set contractURI and logoURI before sharing the token publicly.</li>
-          <li>Use the dashboard BaseScan and Add to wallet actions after launch so users can open the correct token.</li>
+          <li>Set Metadata JSON and logo image before sharing the token publicly.</li>
+          <li>Use the dashboard BaseScan and Copy import info actions after launch so users can open the correct token.</li>
           <li>Renounce the final admin only when no future admin updates are needed.</li>
         </Ol>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
