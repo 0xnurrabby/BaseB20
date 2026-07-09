@@ -281,24 +281,19 @@ const SECTIONS: Section[] = [
   },
   {
     id: "publish",
-    title: "BaseScan Publish",
-    eyebrow: "Verify & Logo",
-    summary: "Use the dashboard publish panel to open BaseScan verification and token logo submission.",
+    title: "Verify & Publish",
+    eyebrow: "BaseScan",
+    summary: "Use the dashboard button to run BaseScan verification from the app.",
     tone: "lime",
     icon: <IconExternal className="h-5 w-5" />,
     body: (
       <>
         <P>
-          BaseScan can still show Verify and Publish on the Contract tab. Use Auto publish in the dashboard first.
-          The app runs BaseScan API checks, attempts the supported verification path and copies the publish pack.
+          BaseScan can still show Verify and Publish on the Contract tab. Use Verify & Publish in the dashboard.
+          The app runs BaseScan API checks and attempts the supported verification path from the server.
         </P>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Recommended order: save logo + JSON in Metadata, then press Auto publish. If BaseScan requires logged-in
-          ownership review for the logo, the app shows that exact blocker.
-        </Callout>
-        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
-          BaseScan header logo is not automatic from on-chain metadata. BaseScan requires a Token Info / Logo request,
-          and approval can take time after submission.
+          Recommended order: save logo + JSON in Metadata, then press Verify & Publish.
         </Callout>
       </>
     ),

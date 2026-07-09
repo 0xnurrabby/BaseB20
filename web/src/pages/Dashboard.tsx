@@ -392,7 +392,7 @@ export function Dashboard() {
           <MetadataPanel {...ctx} />
           <RolesPanel {...ctx} />
           <TransferPanel {...ctx} />
-          <BaseScanPanel token={visibleToken} chainId={targetChainId} />
+          <BaseScanPanel token={visibleToken} />
         </div>
       </TxChainProvider>
     </div>
@@ -1020,41 +1020,16 @@ function TransferPanel({ token, connected, refetch }: Ctx) {
   );
 }
 
-function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: SupportedChainId }) {
-  const dashboardLink = typeof window !== "undefined" ? `${window.location.origin}/dashboard/${token.address}` : "";
+function BaseScanPanel({ token }: { token: TokenView }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "https://base.nurlab.xyz";
-  const baseScan = explorerUrl(chainId);
-  const tokenPage = `${baseScan}/token/${token.address}`;
-  const verifyPage = `${baseScan}/verifyContract?a=${token.address}`;
-  const crossChainVerifyPage = `${baseScan}/address/${token.address}#code`;
-  const verifyAddressPage = `${baseScan}/verifyaddress/`;
-  const tokenUpdatePage = `${baseScan}/tokenupdate/?a=${token.address}`;
   const metadataURI = token.logoURI
     ? buildTokenMetadataUri({ name: token.name, symbol: token.symbol, image: token.logoURI, origin })
     : token.contractURI;
-  const publishPack = [
-    `Token name: ${token.name}`,
-    `Token symbol: ${token.symbol}`,
-    `Token contract: ${token.address}`,
-    `Decimals: ${token.decimals}`,
-    `Chain: Base mainnet`,
-    `BaseScan: ${tokenPage}`,
-    token.logoURI ? `Logo direct link: ${token.logoURI}` : "Logo direct link: not saved yet",
-    metadataURI ? `Metadata JSON: ${metadataURI}` : "Metadata JSON: not saved yet",
-    dashboardLink ? `Dashboard: ${dashboardLink}` : "",
-    "",
-    "BaseScan publish checklist:",
-    "1. Open Verify & Publish and try BaseScan's normal or cross-chain verify flow.",
-    "2. After the contract is accepted, open Token Info / Logo request.",
-    "3. If BaseScan asks for ownership, use Verify Address from the dashboard.",
-    "4. Paste this pack, upload the logo file if BaseScan asks, and submit for review.",
-  ].filter(Boolean).join("\n");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState("");
   const [publishResult, setPublishResult] = useState<{
     ok: boolean;
-    steps: Array<{ key: string; status: "done" | "pending" | "blocked" | "manual"; title: string; detail: string }>;
-    publishPack: string;
+    steps: Array<{ key: string; status: "done" | "pending" | "blocked"; title: string; detail: string }>;
   } | null>(null);
 
   async function autoPublish() {
@@ -1077,11 +1052,6 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || `BaseScan publish failed (${res.status}).`);
       setPublishResult(json);
-      try {
-        await navigator.clipboard.writeText(json.publishPack || publishPack);
-      } catch {
-        /* Clipboard can be blocked by the browser. The copy button remains available. */
-      }
     } catch (error) {
       setPublishError(error instanceof Error ? error.message : "BaseScan publish failed.");
     } finally {
@@ -1092,17 +1062,17 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
   return (
     <SectionCard
       icon={<IconExternal className="h-5 w-5" />}
-      title="BaseScan Publish"
-      desc="Verify the token page and submit the logo to BaseScan."
+      title="Verify & Publish"
+      desc="Runs BaseScan API verification from this website."
       className={tones.picker.card}
       iconClassName={tones.picker.icon}
     >
       <div className="space-y-3">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          One click runs the BaseScan API checks from this app. BaseScan logo approval still depends on BaseScan review.
+          Press once. The website will run the BaseScan API-supported verification flow and show the result here.
         </Callout>
         <Button fullWidth loading={publishing} disabled={publishing} onClick={autoPublish} className="gap-2">
-          <IconSparkles className="h-4 w-4" /> Auto publish
+          <IconSparkles className="h-4 w-4" /> Verify & Publish
         </Button>
         {publishError && <Callout tone="negative" icon={<IconAlert className="h-4 w-4" />}>{publishError}</Callout>}
         {publishResult && (
@@ -1113,7 +1083,6 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
                   "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border",
                   step.status === "done" && "border-positive/30 bg-positive/10 text-positive",
                   step.status === "pending" && "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200",
-                  step.status === "manual" && "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200",
                   step.status === "blocked" && "border-negative/30 bg-negative/10 text-negative"
                 )}>
                   {step.status === "done" ? <IconCheck className="h-3.5 w-3.5" /> : <IconInfo className="h-3.5 w-3.5" />}
@@ -1124,48 +1093,8 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
                 </div>
               </div>
             ))}
-            <CopyButton value={publishResult.publishPack} label="Copy publish pack" className="w-full justify-center py-2.5" />
           </div>
         )}
-        <div className="grid gap-2 sm:grid-cols-2">
-          <a href={tokenPage} target="_blank" rel="noreferrer">
-            <Button variant="outline" fullWidth className="gap-2">
-              Public token page <IconExternal className="h-4 w-4" />
-            </Button>
-          </a>
-          <a href={verifyPage} target="_blank" rel="noreferrer">
-            <Button variant="secondary" fullWidth className="gap-2">
-              Verify & Publish <IconExternal className="h-4 w-4" />
-            </Button>
-          </a>
-          <a href={crossChainVerifyPage} target="_blank" rel="noreferrer">
-            <Button variant="outline" fullWidth className="gap-2">
-              Cross-chain verify <IconExternal className="h-4 w-4" />
-            </Button>
-          </a>
-          <a href={verifyAddressPage} target="_blank" rel="noreferrer">
-            <Button variant="outline" fullWidth className="gap-2">
-              Verify address <IconExternal className="h-4 w-4" />
-            </Button>
-          </a>
-          <a href={tokenUpdatePage} target="_blank" rel="noreferrer">
-            <Button variant="outline" fullWidth className="gap-2">
-              Token Info / Logo <IconExternal className="h-4 w-4" />
-            </Button>
-          </a>
-          <a href={`${baseScan}/address/${B20_FACTORY_ADDRESS}`} target="_blank" rel="noreferrer">
-            <Button variant="outline" fullWidth className="gap-2">
-              B20 creator <IconExternal className="h-4 w-4" />
-            </Button>
-          </a>
-          <AddToWalletButton token={token} variant="outline" />
-          <CopyButton value={publishPack} label="Copy publish pack" className="justify-center py-2.5" />
-          {dashboardLink && <CopyButton value={dashboardLink} label="Copy dashboard link" className="justify-center py-2.5" />}
-        </div>
-        <div className="rounded-xl border border-sky-200/70 bg-surface/75 p-3 text-xs leading-relaxed text-muted dark:border-sky-400/20">
-          <p className="font-medium text-fg">BaseScan order</p>
-          <p className="mt-1">1. Save logo + JSON in Metadata. 2. Verify & Publish. 3. Verify address if asked. 4. Submit Token Info / Logo. BaseScan may take time to approve logo display.</p>
-        </div>
       </div>
     </SectionCard>
   );

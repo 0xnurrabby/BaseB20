@@ -2,15 +2,10 @@ const { isAddress } = require("viem");
 const { readJson, send } = require("./_http");
 
 const API_URL = "https://api.etherscan.io/v2/api";
-const BASESCAN = "https://basescan.org";
 const CHAIN_ID = "8453";
 
 function clean(value, max = 300) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
-
-function link(path) {
-  return `${BASESCAN}${path}`;
 }
 
 async function basescan(params, method = "GET") {
@@ -95,30 +90,8 @@ module.exports = async function handler(req, res) {
   const address = clean(body.address, 64);
   if (!isAddress(address)) return send(res, 400, { error: "Invalid token address." });
 
-  const name = clean(body.name, 120);
-  const symbol = clean(body.symbol, 32).toUpperCase();
-  const decimals = Number(body.decimals ?? 18);
   const logoURI = clean(body.logoURI, 600);
   const metadataURI = clean(body.metadataURI, 900);
-
-  const links = {
-    token: link(`/token/${address}`),
-    verify: link(`/verifyContract?a=${address}`),
-    crossChainVerify: link(`/address/${address}#code`),
-    verifyAddress: link("/verifyaddress/"),
-    tokenUpdate: link(`/tokenupdate/?a=${address}`),
-  };
-
-  const publishPack = [
-    `Token name: ${name || "B20 Token"}`,
-    `Token symbol: ${symbol || "B20"}`,
-    `Token contract: ${address}`,
-    `Decimals: ${Number.isFinite(decimals) ? decimals : 18}`,
-    "Chain: Base mainnet",
-    `BaseScan: ${links.token}`,
-    logoURI ? `Logo direct link: ${logoURI}` : "Logo direct link: not saved yet",
-    metadataURI ? `Metadata JSON: ${metadataURI}` : "Metadata JSON: not saved yet",
-  ].join("\n");
 
   const steps = [];
   try {
@@ -163,21 +136,12 @@ module.exports = async function handler(req, res) {
     status: metadataURI && logoURI ? "done" : "blocked",
     title: metadataURI && logoURI ? "Metadata ready" : "Save logo + JSON first",
     detail: metadataURI && logoURI
-      ? "The publish pack includes logo and metadata JSON."
+      ? "Logo and metadata JSON are ready for BaseScan."
       : "Go to Metadata and use Save logo + JSON before publishing.",
   });
 
-  steps.push({
-    key: "token-info",
-    status: "manual",
-    title: "BaseScan logo submission requires review",
-    detail: "BaseScan does not provide a public write API for Token Info / Logo. Their official flow requires a logged-in account, verified address ownership and manual review.",
-  });
-
   return send(res, 200, {
-    ok: steps.every((step) => step.status === "done" || step.status === "manual"),
+    ok: steps.every((step) => step.status === "done"),
     steps,
-    links,
-    publishPack,
   });
 };
