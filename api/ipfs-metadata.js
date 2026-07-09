@@ -126,6 +126,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    assertPinataKey();
     const name = clean(payload.name, "B20 Token");
     const symbol = clean(payload.symbol, "B20", 24).toUpperCase();
     const image = await imageFromPayload(payload, safeName(name, "b20-token"));
