@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAccount, useChainId, useReadContracts } from "wagmi";
+import { useAccount, useChainId, useReadContracts, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { formatUnits, isAddress, parseUnits, zeroAddress } from "viem";
 import {
   B20_ABI,
@@ -695,7 +695,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     >
       <div className="space-y-4">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Upload or paste a logo image link, save it on-chain, then use the generated metadata JSON link.
+          Upload a logo, then save logo and JSON together. Wallets usually read the JSON link first.
         </Callout>
         {!canMetadata && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Connected wallet does not hold METADATA_ROLE.</Callout>}
         <div className="flex items-center gap-3 rounded-xl border border-violet-200/70 bg-surface/75 px-4 py-3 dark:border-violet-400/20">
@@ -747,21 +747,146 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
           <LogoPicker value={logoURI} onChange={setLogoURI} symbol={symbol || token.symbol} disabled={!canMetadata} />
           <div className="mt-3 flex gap-2">
             <Input value={logoURI} onChange={(e) => setLogoURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
-            <TxButton
-              variant="secondary"
-              disabled={!canMetadata || !!logoError || logoURI === token.logoURI}
-              build={() => ({ address: token.address, abi: B20_ABI, functionName: "updateExtraMetadata", args: ["logoURI", logoURI.trim()] })}
+            <MetadataSyncButton
+              token={token}
+              chainId={chainId}
+              logoURI={logoURI}
+              metadataURI={suggestedContractURI}
+              disabled={!canMetadata || !!logoError || !logoURI.trim()}
               onSuccess={() => {
                 saveToken({ address: token.address, name: token.name, symbol: token.symbol, chainId, createdAt: Date.now(), logoURI: logoURI.trim() });
+                setContractURI(suggestedContractURI || contractURI);
                 refetch();
               }}
-            >
-              Save on-chain
-            </TxButton>
+            />
           </div>
         </Field>
       </div>
     </SectionCard>
+  );
+}
+
+function MetadataSyncButton({
+  token,
+  chainId,
+  logoURI,
+  metadataURI,
+  disabled,
+  onSuccess,
+}: {
+  token: TokenView;
+  chainId: SupportedChainId;
+  logoURI: string;
+  metadataURI: string;
+  disabled?: boolean;
+  onSuccess: () => void;
+}) {
+  const walletChainId = useChainId();
+  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
+  const [queue, setQueue] = useState<Array<"logo" | "json">>([]);
+  const [active, setActive] = useState<"logo" | "json" | "done" | null>(null);
+  const [handledHash, setHandledHash] = useState<`0x${string}` | undefined>();
+  const [localError, setLocalError] = useState("");
+  const { isLoading: mining, isSuccess } = useWaitForTransactionReceipt({ hash, chainId });
+
+  const cleanLogo = logoURI.trim();
+  const needsLogo = cleanLogo !== token.logoURI;
+  const needsJson = !!metadataURI && metadataURI !== token.contractURI;
+  const actions = useMemo(() => {
+    const next: Array<"logo" | "json"> = [];
+    if (needsLogo) next.push("logo");
+    if (needsJson) next.push("json");
+    return next;
+  }, [needsLogo, needsJson]);
+
+  function runAction(action: "logo" | "json") {
+    setActive(action);
+    const req = action === "logo"
+      ? { functionName: "updateExtraMetadata", args: ["logoURI", cleanLogo] as const }
+      : { functionName: "updateContractURI", args: [metadataURI] as const };
+    writeContract({
+      chainId,
+      address: token.address,
+      abi: B20_ABI,
+      functionName: req.functionName,
+      args: req.args,
+      gas: 650_000n,
+    } as unknown as Parameters<typeof writeContract>[0]);
+  }
+
+  useEffect(() => {
+    if (!isSuccess || !hash || hash === handledHash || !active) return;
+    setHandledHash(hash);
+    const remaining = queue.slice(1);
+    if (remaining.length > 0) {
+      setQueue(remaining);
+      runAction(remaining[0]);
+      return;
+    }
+    setQueue([]);
+    setActive("done");
+    setLocalError("");
+    onSuccess();
+    const t = setTimeout(() => {
+      setActive(null);
+      reset();
+    }, 1800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuccess, hash]);
+
+  useEffect(() => {
+    if (!error) return;
+    setQueue([]);
+    setActive(null);
+  }, [error]);
+
+  async function onClick() {
+    if (actions.length === 0) return;
+    setLocalError("");
+    reset();
+    setHandledHash(undefined);
+    setQueue(actions);
+    try {
+      if (walletChainId !== chainId) {
+        await switchChainAsync({ chainId });
+      }
+      runAction(actions[0]);
+    } catch (switchError) {
+      const message = switchError instanceof Error ? switchError.message : "Network switch failed.";
+      setLocalError(message.includes("User rejected") ? "Network switch rejected." : `Switch to ${chainName(chainId)} and try again.`);
+      setQueue([]);
+      setActive(null);
+    }
+  }
+
+  const busy = isSwitching || isPending || mining || (active !== null && active !== "done");
+  const friendlyError = localError || (error
+    ? error.message.includes("User rejected")
+      ? "Rejected in wallet"
+      : error.message.split("\n")[0].slice(0, 120)
+    : "");
+  const label = active === "done"
+    ? "Done"
+    : active === "logo"
+      ? "Saving logo..."
+      : active === "json"
+        ? "Saving JSON..."
+        : needsLogo && needsJson
+          ? "Save logo + JSON"
+          : needsLogo
+            ? "Save logo"
+            : "Save JSON";
+
+  return (
+    <div className="shrink-0">
+      <Button type="button" variant={active === "done" ? "success" : "secondary"} loading={busy} disabled={disabled || busy || actions.length === 0} onClick={onClick} className="whitespace-nowrap">
+        {active === "done" && <IconCheck className="h-4 w-4" />}
+        {label}
+      </Button>
+      {friendlyError && <p className="mt-1.5 max-w-[180px] text-xs text-negative">{friendlyError}</p>}
+    </div>
   );
 }
 

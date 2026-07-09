@@ -18,6 +18,13 @@ function cleanImage(value) {
   return text.slice(0, 600);
 }
 
+function cleanSource(value) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return "";
+  if (!/^(https?|ipfs):\/\//i.test(text)) return "";
+  return text.slice(0, 600);
+}
+
 module.exports = function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.setHeader("access-control-allow-origin", "*");
@@ -34,13 +41,15 @@ module.exports = function handler(req, res) {
   const name = clean(req.query.name, "B20 Token");
   const symbol = clean(req.query.symbol, "B20", 24).toUpperCase();
   const image = cleanImage(req.query.image);
+  const source = cleanSource(req.query.source);
 
   return send(res, 200, {
     name,
     symbol,
     description: `${name} (${symbol}) is a native B20 token on Base.`,
     image,
-    logoURI: image,
+    image_url: image,
+    logoURI: source || image,
     external_url: "https://base.nurlab.xyz",
     properties: {
       chain: "Base",

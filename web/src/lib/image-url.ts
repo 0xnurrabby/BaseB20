@@ -21,3 +21,12 @@ export function logoUrlError(value: string) {
 
   return "";
 }
+
+export function isDirectImgBBImageUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" && url.hostname.toLowerCase() === "i.ibb.co" && /\.(png|jpe?g|gif|webp)$/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}

@@ -1,4 +1,16 @@
+import { isDirectImgBBImageUrl } from "./image-url";
+
 const FALLBACK_ORIGIN = "https://base.nurlab.xyz";
+
+function buildMetadataImageUrl(image: string, base: string) {
+  const clean = image.trim();
+  if (!clean) return "";
+  if (!isDirectImgBBImageUrl(clean)) return clean;
+
+  const url = new URL("/api/logo-image", base);
+  url.searchParams.set("url", clean);
+  return url.toString();
+}
 
 export function buildTokenMetadataUri({
   name,
@@ -15,6 +27,8 @@ export function buildTokenMetadataUri({
   const url = new URL("/api/token-metadata", base);
   url.searchParams.set("name", name.trim() || "B20 Token");
   url.searchParams.set("symbol", symbol.trim() || "B20");
-  if (image.trim()) url.searchParams.set("image", image.trim());
+  const metadataImage = buildMetadataImageUrl(image, base);
+  if (metadataImage) url.searchParams.set("image", metadataImage);
+  if (image.trim()) url.searchParams.set("source", image.trim());
   return url.toString();
 }

@@ -40,7 +40,7 @@ Official references:
 - Name, symbol, initial supply and immutable Asset decimals
 - Asset decimals validation from 6 to 18
 - Supply cap with uint128 max as the no-cap sentinel
-- Logo image upload saves a direct `i.ibb.co` image link, then stores it as Asset `extraMetadata("logoURI")`
+- Logo image upload saves a direct `i.ibb.co` image link, stores it as Asset `extraMetadata("logoURI")`, and generates wallet-friendly JSON that proxies the image with proper headers
 - Generated metadata JSON link for the token `contractURI`
 - Bootstrap permission setup for mint, burn, pause and metadata controls
 - Initial supply minted during the factory creation transaction

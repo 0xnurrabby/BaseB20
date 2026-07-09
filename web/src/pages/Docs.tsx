@@ -233,14 +233,17 @@ const SECTIONS: Section[] = [
         <InfoGrid
           rows={[
             ["Logo image", "Direct image link created after upload, usually an i.ibb.co ImgBB URL"],
-            ["Metadata JSON", "JSON link for wallets and explorers. Click Use generated JSON after saving the logo image"],
+            ["Metadata JSON", "JSON link for wallets and explorers. The app now saves logo and JSON together"],
             ["Manual metadata", "Only needed if you already host your own JSON on IPFS or HTTPS"],
             ["Custom key/value", "Advanced B20 extraMetadata. Hidden from the normal dashboard because most tokens do not need it"],
             ["Wallet import", "Use Copy import info, then paste the token address in your wallet custom-token screen"],
           ]}
         />
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
-          For normal launches: upload logo, save the logo image on-chain, click Use generated JSON, then save Metadata JSON.
+          For normal launches: upload logo, then use Save logo + JSON. It stores the logo link and updates the wallet metadata link.
+        </Callout>
+        <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
+          Uploaded ImgBB logos are served through the app metadata image endpoint so wallets receive normal image headers.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
           Do not paste ImgBB Viewer links like ibb.co/abc. Wallets need Direct links like i.ibb.co/folder/image.png.
