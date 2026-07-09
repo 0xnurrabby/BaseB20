@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "./ui";
+import { ipfsGatewayUrl } from "../lib/image-url";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
@@ -25,13 +26,14 @@ export function TokenLogo({
 }) {
   const [failed, setFailed] = useState(false);
   const clean = src?.trim();
+  const imageSrc = clean ? ipfsGatewayUrl(clean) : "";
 
   useEffect(() => setFailed(false), [clean]);
 
-  if (clean && !failed) {
+  if (imageSrc && !failed) {
     return (
       <img
-        src={clean}
+        src={imageSrc}
         alt=""
         referrerPolicy="no-referrer"
         loading="lazy"

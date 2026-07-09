@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES, uploadImage } from "../lib/upload";
 import { Button, cn } from "./ui";
 import { IconCheck, IconLoader, IconX } from "./icons";
+import { ipfsGatewayUrl } from "../lib/image-url";
 
 /**
- * Token logo picker. The user selects an image, previews it, then saves it to
- * ImgBB. The uploaded URL is written back through onChange and later stored
- * on-chain as logoURI.
+ * Token logo picker. In immediate mode it uploads the image now. In deferred
+ * mode it keeps the file ready so the create flow can pin it with metadata.
  */
 export function LogoPicker({
   value,
@@ -14,12 +14,18 @@ export function LogoPicker({
   symbol,
   error,
   disabled,
+  mode = "immediate",
+  onFileChange,
+  onPreviewChange,
 }: {
   value: string;
   onChange: (url: string) => void;
   symbol: string;
   error?: string;
   disabled?: boolean;
+  mode?: "immediate" | "defer";
+  onFileChange?: (file: File | null) => void;
+  onPreviewChange?: (url: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "done">("idle");
@@ -48,8 +54,14 @@ export function LogoPicker({
     }
 
     if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const nextPreview = URL.createObjectURL(file);
     setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    setPreviewUrl(nextPreview);
+    if (mode === "defer") {
+      onFileChange?.(file);
+      onPreviewChange?.(nextPreview);
+      onChange("");
+    }
   }
 
   function openPicker() {
@@ -58,7 +70,7 @@ export function LogoPicker({
   }
 
   async function saveImage() {
-    if (!selectedFile || disabled) return;
+    if (!selectedFile || disabled || mode === "defer") return;
     setUploadError(null);
     setStatus("uploading");
     try {
@@ -80,12 +92,14 @@ export function LogoPicker({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setSelectedFile(null);
+    onFileChange?.(null);
+    onPreviewChange?.("");
     setUploadError(null);
     setStatus("idle");
-    if (!selectedFile) onChange("");
+    if (!selectedFile || mode === "defer") onChange("");
   }
 
-  const preview = previewUrl || value;
+  const preview = previewUrl || (value ? ipfsGatewayUrl(value) : "");
 
   return (
     <div>
@@ -123,15 +137,21 @@ export function LogoPicker({
             <Button type="button" size="sm" variant="secondary" onClick={openPicker} loading={status === "uploading"} disabled={disabled}>
               {selectedFile || value ? "Change image" : "Choose image"}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={saveImage}
-              loading={status === "uploading"}
-              disabled={disabled || !selectedFile || status === "uploading"}
-            >
-              Save
-            </Button>
+            {mode === "immediate" ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={saveImage}
+                loading={status === "uploading"}
+                disabled={disabled || !selectedFile || status === "uploading"}
+              >
+                Save
+              </Button>
+            ) : selectedFile ? (
+              <span className="inline-flex items-center gap-1 text-xs text-positive">
+                <IconCheck className="h-3.5 w-3.5" /> Ready
+              </span>
+            ) : null}
             {(selectedFile || value) && status !== "uploading" && !disabled && (
               <button
                 type="button"

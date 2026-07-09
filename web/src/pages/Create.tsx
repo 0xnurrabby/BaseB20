@@ -37,6 +37,7 @@ import {
   IconCoins,
   IconExternal,
   IconGauge,
+  IconLoader,
   IconRocket,
   IconSettings,
   IconShield,
@@ -48,6 +49,7 @@ import { TokenLogo } from "../components/TokenLogo";
 import { AddToWalletButton } from "../components/AddToWalletButton";
 import { buildTokenMetadataUri } from "../lib/metadata";
 import { logoUrlError } from "../lib/image-url";
+import { uploadTokenMetadata } from "../lib/ipfs";
 
 interface FormState {
   name: string;
@@ -86,6 +88,8 @@ interface PendingCreate {
   salt: `0x${string}`;
 }
 
+type CreateStep = "idle" | "metadata" | "wallet" | "chain";
+
 const panel = {
   basics: {
     card: "border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]",
@@ -111,6 +115,9 @@ export function Create() {
   const [pending, setPending] = useState<PendingCreate | null>(null);
   const [networkError, setNetworkError] = useState("");
   const [savedHash, setSavedHash] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [createStep, setCreateStep] = useState<CreateStep>("idle");
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setF((s) => ({ ...s, [k]: v }));
@@ -149,11 +156,11 @@ export function Create() {
 
   const hasErrors = Object.keys(errors).length > 0;
 
-  function buildConfig(): B20CreateConfig | null {
+  function buildConfig(metadata?: Partial<Pick<B20CreateConfig, "contractURI" | "logoURI">>): B20CreateConfig | null {
     if (!address || !decimalsOk || !supplyRaw || supplyRaw <= 0n || capRaw === null) return null;
     const name = f.name.trim();
     const symbol = f.symbol.trim().toUpperCase();
-    const logoURI = f.logoURI.trim();
+    const logoURI = metadata?.logoURI ?? f.logoURI.trim();
     return {
       name,
       symbol,
@@ -161,7 +168,7 @@ export function Create() {
       admin: address,
       initialSupply: supplyRaw,
       supplyCap: capRaw,
-      contractURI: f.contractURI.trim() || (logoURI ? buildTokenMetadataUri({ name, symbol, image: logoURI }) : ""),
+      contractURI: metadata?.contractURI ?? (f.contractURI.trim() || (logoURI ? buildTokenMetadataUri({ name, symbol, image: logoURI }) : "")),
       logoURI,
       grantMinter: f.grantMinter,
       grantBurner: f.grantBurner,
@@ -176,9 +183,10 @@ export function Create() {
       setTouched(Object.keys(DEFAULTS).reduce((a, k) => ({ ...a, [k]: true }), {}));
       return;
     }
-    const config = buildConfig();
-    if (!config || !address) return;
+    const draftConfig = buildConfig();
+    if (!draftConfig || !address) return;
     setNetworkError("");
+    setCreateStep("metadata");
     try {
       if (chainId !== targetChainId) {
         await switchChainAsync({ chainId: targetChainId });
@@ -189,11 +197,38 @@ export function Create() {
       return;
     }
 
+    let metadataOverride: Partial<Pick<B20CreateConfig, "contractURI" | "logoURI">> | undefined;
+    try {
+      if (!f.contractURI.trim() || logoFile || draftConfig.logoURI) {
+        const uploaded = await uploadTokenMetadata({
+          name: draftConfig.name,
+          symbol: draftConfig.symbol,
+          imageFile: logoFile,
+          imageUrl: logoFile ? "" : draftConfig.logoURI,
+        });
+        metadataOverride = {
+          contractURI: uploaded.contractURI,
+          logoURI: uploaded.logoURI,
+        };
+      }
+    } catch (metadataError) {
+      setCreateStep("idle");
+      setNetworkError(metadataError instanceof Error ? metadataError.message : "IPFS metadata upload failed.");
+      return;
+    }
+
+    const config = buildConfig(metadataOverride);
+    if (!config) {
+      setCreateStep("idle");
+      return;
+    }
+
     const salt = randomSalt(`${address}:${config.symbol}`);
     const params = encodeAssetCreateParams(config);
     const initCalls = buildB20InitCalls(config);
     setPending({ config, salt });
     setSavedHash("");
+    setCreateStep("wallet");
     writeContract({
       chainId: targetChainId,
       address: B20_FACTORY_ADDRESS,
@@ -236,10 +271,23 @@ export function Create() {
     setSavedHash(hash ?? "");
   }, [createdAddress, pending, address, targetChainId, hash, savedHash]);
 
+  useEffect(() => {
+    if (hash && createStep === "wallet") setCreateStep("chain");
+  }, [hash, createStep]);
+
+  useEffect(() => {
+    if (error) setCreateStep("idle");
+  }, [error]);
+
+  useEffect(() => {
+    if (createdAddress) setCreateStep("idle");
+  }, [createdAddress]);
+
   function resetAll() {
     reset();
     setPending(null);
     setSavedHash("");
+    setCreateStep("idle");
   }
 
   function applyStandardFixes() {
@@ -313,8 +361,15 @@ export function Create() {
                 <Input inputMode="numeric" value={f.decimals} onChange={(e) => set("decimals", e.target.value.replace(/[^\d]/g, ""))} placeholder="18" />
               </Field>
               <div className="sm:col-span-2">
-                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="Upload saves ImgBB Direct link automatically.">
-                  <LogoPicker value={f.logoURI} onChange={(url) => set("logoURI", url)} symbol={f.symbol} />
+                <Field label="Logo" error={err("logoURI", errors.logoURI)} hint="Image and metadata are pinned to IPFS during token creation.">
+                  <LogoPicker
+                    mode="defer"
+                    value={f.logoURI}
+                    onChange={(url) => set("logoURI", url)}
+                    onFileChange={setLogoFile}
+                    onPreviewChange={setLogoPreview}
+                    symbol={f.symbol}
+                  />
                 </Field>
               </div>
             </div>
@@ -355,7 +410,7 @@ export function Create() {
         </div>
 
         <div className="lg:sticky lg:top-24 lg:h-fit">
-          <PreviewCard f={f} supplyRaw={supplyRaw} capRaw={capRaw} />
+          <PreviewCard f={f} supplyRaw={supplyRaw} capRaw={capRaw} logoPreview={logoPreview} />
           <B20ReportCard
             f={f}
             decimalsOk={decimalsOk}
@@ -380,9 +435,9 @@ export function Create() {
                 Switch to {chainName(DEFAULT_CHAIN_ID)} from the wallet menu.
               </Callout>
             ) : (
-              <Button size="lg" fullWidth loading={isSwitching || isPending || isMining} onClick={onCreate} className="gap-2">
+              <Button size="lg" fullWidth loading={isSwitching || isPending || isMining || createStep === "metadata"} onClick={onCreate} className="gap-2">
                 <IconRocket className="h-5 w-5" />
-                {isSwitching ? "Switching network..." : isPending ? "Confirm in wallet..." : isMining ? "Creating B20..." : "Create native B20"}
+                {createStep === "metadata" ? "Uploading metadata..." : isSwitching ? "Switching network..." : isPending ? "Confirm in wallet..." : isMining ? "Creating B20..." : "Create native B20"}
               </Button>
             )}
             {hasErrors && isConnected && supported && <p className="mt-2 text-center text-xs text-negative">Fix the highlighted fields to continue.</p>}
@@ -392,6 +447,7 @@ export function Create() {
         </div>
       </div>
 
+      <CreateProgressModal open={createStep !== "idle" && !createdAddress} step={createStep} hasLogo={!!logoFile || !!f.logoURI.trim()} />
       <SuccessModal open={!!createdAddress} onClose={resetAll} address={createdAddress} chainId={targetChainId} cfg={pending?.config ?? null} />
     </div>
   );
@@ -409,13 +465,79 @@ function RoleToggle({ title, desc, checked, onChange }: { title: string; desc: s
   );
 }
 
-function PreviewCard({ f, supplyRaw, capRaw }: { f: FormState; supplyRaw: bigint | null; capRaw: bigint | null }) {
+function CreateProgressModal({ open, step, hasLogo }: { open: boolean; step: CreateStep; hasLogo: boolean }) {
+  const steps = [
+    {
+      key: "settings",
+      title: "Prepare launch",
+      desc: "Checking token settings",
+      done: step === "metadata" || step === "wallet" || step === "chain",
+      active: false,
+      icon: <IconSettings className="h-4 w-4" />,
+    },
+    {
+      key: "metadata",
+      title: "Upload metadata",
+      desc: hasLogo ? "Pinning image and details to IPFS" : "Pinning token details to IPFS",
+      done: step === "wallet" || step === "chain",
+      active: step === "metadata",
+      icon: <IconCoins className="h-4 w-4" />,
+    },
+    {
+      key: "wallet",
+      title: "Confirm in your wallet",
+      desc: "Approve the Base transaction",
+      done: step === "chain",
+      active: step === "wallet",
+      icon: <IconWallet className="h-4 w-4" />,
+    },
+    {
+      key: "chain",
+      title: "Create native B20",
+      desc: "Waiting for Base confirmation",
+      done: false,
+      active: step === "chain",
+      icon: <IconRocket className="h-4 w-4" />,
+    },
+  ];
+
+  return (
+    <Modal open={open} onClose={() => undefined} title="Creating token" size="md">
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border bg-surface/70 p-4">
+          {steps.map((item, index) => (
+            <div key={item.key} className="relative flex gap-4 pb-7 last:pb-0">
+              {index < steps.length - 1 && <span className="absolute left-[21px] top-10 h-[calc(100%-2.5rem)] w-px bg-border" />}
+              <span
+                className={cn(
+                  "z-10 grid h-11 w-11 shrink-0 place-items-center rounded-full border",
+                  item.done && "border-positive/40 bg-positive/10 text-positive",
+                  item.active && "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200",
+                  !item.done && !item.active && "border-border bg-elevated text-faint"
+                )}
+              >
+                {item.done ? <IconCheck className="h-5 w-5" /> : item.active ? <IconLoader className="h-5 w-5" /> : item.icon}
+              </span>
+              <div className="min-w-0 pt-1">
+                <p className={cn("text-sm font-semibold", item.done || item.active ? "text-fg" : "text-faint")}>{item.title}</p>
+                <p className={cn("mt-1 text-xs", item.active ? "text-sky-700 dark:text-sky-200" : "text-muted")}>{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-xs text-muted">Keep this open until it completes.</p>
+      </div>
+    </Modal>
+  );
+}
+
+function PreviewCard({ f, supplyRaw, capRaw, logoPreview }: { f: FormState; supplyRaw: bigint | null; capRaw: bigint | null; logoPreview?: string }) {
   const symbol = f.symbol.trim().toUpperCase() || "B20";
   return (
     <Card className="overflow-hidden border-sky-200/80 bg-sky-50/55 dark:border-sky-400/20 dark:bg-sky-400/[0.07]">
       <div className="h-1 bg-gradient-to-r from-sky-300 via-emerald-200 to-violet-200 dark:from-sky-400/50 dark:via-emerald-400/30 dark:to-violet-400/30" />
       <div className="flex items-center gap-3 border-b border-sky-200/70 bg-surface/80 px-5 py-4 dark:border-sky-400/20 dark:bg-surface/70">
-        <TokenLogo src={f.logoURI} symbol={symbol} size="md" tone="sky" />
+        <TokenLogo src={logoPreview || f.logoURI} symbol={symbol} size="md" tone="sky" />
         <div className="min-w-0">
           <p className="truncate font-display text-2xl leading-none text-fg">{f.name.trim() || "Your B20 Token"}</p>
           <p className="font-mono text-xs text-muted">${symbol}</p>

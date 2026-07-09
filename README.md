@@ -40,8 +40,8 @@ Official references:
 - Name, symbol, initial supply and immutable Asset decimals
 - Asset decimals validation from 6 to 18
 - Supply cap with uint128 max as the no-cap sentinel
-- Logo image upload saves a direct `i.ibb.co` image link, stores it as Asset `extraMetadata("logoURI")`, and generates wallet-friendly JSON that proxies the image with proper headers
-- Generated metadata JSON link for the token `contractURI`
+- Token creation pins the logo image and metadata JSON to IPFS, then stores the IPFS logo as Asset `extraMetadata("logoURI")`
+- Generated IPFS metadata JSON for the token `contractURI`
 - Bootstrap permission setup for mint, burn, pause and metadata controls
 - Initial supply minted during the factory creation transaction
 
@@ -86,6 +86,7 @@ Frontend:
 Server:
 
 - `IMGBB_API_KEY`, server-side logo upload key
+- `PINATA_JWT`, server-side IPFS pinning token for launch metadata
 - `DATABASE_URL`, Neon connection string for analytics and admin stats
 - `ADMIN_ADDRESSES`, comma-separated wallet addresses allowed into `/admin`
 - `ANALYTICS_SALT`, optional salt for anonymous visitor hashing
@@ -115,4 +116,4 @@ verification path, and validates logo + metadata readiness from inside the app.
 
 - Frontend: Vite, React 18, TypeScript, Tailwind CSS, wagmi, viem, TanStack
   Query and React Router.
-- Serverless: Vercel API routes for analytics, admin stats and ImgBB uploads.
+- Serverless: Vercel API routes for analytics, admin stats, ImgBB uploads and IPFS metadata pinning.

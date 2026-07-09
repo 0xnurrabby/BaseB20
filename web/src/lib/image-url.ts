@@ -22,6 +22,13 @@ export function logoUrlError(value: string) {
   return "";
 }
 
+export function ipfsGatewayUrl(value: string) {
+  const text = value.trim();
+  if (!/^ipfs:\/\//i.test(text)) return text;
+  const path = text.replace(/^ipfs:\/\//i, "").replace(/^ipfs\//i, "");
+  return `https://ipfs.io/ipfs/${path}`;
+}
+
 export function isDirectImgBBImageUrl(value: string) {
   try {
     const url = new URL(value.trim());
