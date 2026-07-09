@@ -272,7 +272,7 @@ export function Create() {
     if (!error) return "";
     if (error.message.includes("User rejected")) return "Transaction rejected.";
     if (/estimate|simulation|node service|gas/i.test(error.message)) {
-      return "Wallet simulation failed. Check that wallet network is Base, then retry. The form already checks decimals, cap and roles before sending.";
+      return "Wallet simulation failed. Check that wallet network is Base, then retry. The form already checks decimals, cap and permissions before sending.";
     }
     return error.message.split("\n")[0].slice(0, 160);
   }
@@ -339,7 +339,7 @@ export function Create() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <RoleToggle title="Minter role" desc="Mint more supply later." checked={f.grantMinter} onChange={(v) => set("grantMinter", v)} />
                 <RoleToggle title="Burn role" desc="Use burn controls later." checked={f.grantBurner} onChange={(v) => set("grantBurner", v)} />
-                <RoleToggle title="Pause roles" desc="Emergency pause controls." checked={f.grantPauser} onChange={(v) => set("grantPauser", v)} />
+                <RoleToggle title="Pause controls" desc="Emergency pause controls." checked={f.grantPauser} onChange={(v) => set("grantPauser", v)} />
                 <RoleToggle title="Metadata role" desc="Update name, symbol and logo." checked={f.grantMetadata} onChange={(v) => set("grantMetadata", v)} />
               </div>
 
@@ -454,17 +454,17 @@ function B20ReportCard({
       ? {
           tone: "negative" as const,
           label: "Input validation",
-          text: "Missing or invalid fields block creation. Auto-fix fills safe launch defaults.",
+          text: "Creator fix: missing or invalid fields block launch. Auto-fix fills launch-ready defaults.",
           action: "Auto-fix",
           onAction: onFixAll,
         }
-      : { tone: "positive" as const, label: "Input validation", text: "Name, symbol, decimals and supply cap pass local checks." },
+      : { tone: "positive" as const, label: "Input validation", text: "Form values pass local checks." },
     decimalsOk
       ? { tone: "positive" as const, label: "Asset decimals", text: "B20 Asset decimals are inside the required 6-18 range." }
       : {
           tone: "negative" as const,
           label: "Asset decimals",
-          text: "Native B20 Asset tokens only support decimals from 6 to 18.",
+          text: "Creator fix: native B20 Asset tokens only support decimals from 6 to 18.",
           action: "Use 18",
           onAction: onFixDecimals,
         },
@@ -474,7 +474,7 @@ function B20ReportCard({
       : {
           tone: "warn" as const,
           label: "Supply cap",
-          text: "No cap uses uint128 max. For public launches, a fixed cap is easier to trust.",
+          text: "Buyer trust note: no cap means future supply can be much larger. A fixed cap is easier for buyers to trust.",
           action: "Match supply",
           onAction: onFixCap,
         },
@@ -482,8 +482,8 @@ function B20ReportCard({
       ? {
           tone: "warn" as const,
           label: "Mint role",
-          text: "Minter role remains active after launch. For fixed supply, turn it off.",
-          action: "Make fixed",
+          text: "Buyer trust note: this is useful for you as admin, because you can mint later. Buyers may see it as extra supply risk.",
+          action: "Turn off mint",
           onAction: onMakeFixedSupply,
         }
       : { tone: "positive" as const, label: "Mint role", text: "Initial supply is created, then future minting is turned off." },
@@ -492,23 +492,22 @@ function B20ReportCard({
       : {
           tone: "warn" as const,
           label: "Burn role",
-          text: "Burn panel needs BURN_ROLE. Enable it if you want burn controls after launch.",
+          text: "Creator tool: enable this if you want the dashboard burn controls after launch.",
           action: "Enable",
           onAction: onEnableBurn,
         },
     f.grantPauser
       ? {
           tone: "warn" as const,
-          label: "Pause roles",
-          text: "Pause controls are admin powers. Keep them only if you need emergency controls.",
-          action: "Disable",
+          label: "Pause controls",
+          text: "Buyer trust note: emergency pause can protect users, but it is still admin control. Keep only if needed.",
+          action: "Turn off pause",
           onAction: onDisablePause,
         }
-      : { tone: "positive" as const, label: "Pause roles", text: "No pause role is granted." },
+      : { tone: "positive" as const, label: "Pause controls", text: "Pause controls are off." },
   ];
   const review = checks.filter((c) => c.tone === "warn").length;
   const fail = checks.filter((c) => c.tone === "negative").length;
-  const score = Math.max(0, 100 - review * 8 - fail * 18);
 
   return (
     <Card className="mt-4 overflow-hidden border-emerald-200/80 bg-emerald-50/55 dark:border-emerald-400/20 dark:bg-emerald-400/[0.07]">
@@ -518,11 +517,13 @@ function B20ReportCard({
             <IconShield className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm font-semibold">B20 standard check</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Errors block launch. Warnings are admin-risk choices you can fix with one click.</p>
+            <p className="text-sm font-semibold">Launch checklist</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Red means creator form fix. Yellow means buyer trust choice, not broken code.</p>
           </div>
         </div>
-        <Badge tone={fail ? "negative" : review ? "warn" : "positive"}>{score}/100</Badge>
+        <Badge tone={fail ? "negative" : review ? "warn" : "positive"}>
+          {fail ? "Fix required" : review ? `${review} buyer note${review > 1 ? "s" : ""}` : "Ready"}
+        </Badge>
       </div>
       <div className="space-y-2 px-5 py-4">
         {checks.map((check) => (
@@ -543,7 +544,7 @@ function B20ReportCard({
         ))}
       </div>
       <div className="border-t border-emerald-200/70 px-5 py-3 text-[11px] leading-relaxed text-faint dark:border-emerald-400/20">
-        B20 is native to Base. This app does not deploy custom Solidity token bytecode.
+        A yellow note does not mean your token creation is failing. It shows admin powers that buyers may care about.
       </div>
     </Card>
   );

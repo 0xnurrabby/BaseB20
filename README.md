@@ -14,7 +14,7 @@ BaseB20/
 
 B20 is Base's native token standard. It is an ERC-20 superset implemented as
 chain precompiles, so standard ERC-20 calls and events remain compatible while
-B20 adds roles, supply caps, granular pause, policy hooks, memos, permit and
+B20 adds permissions, supply caps, granular pause, policy hooks, memos, permit and
 Asset-specific features.
 
 This app currently creates the B20 Asset variant on Base mainnet:
@@ -42,19 +42,19 @@ Official references:
 - Supply cap with uint128 max as the no-cap sentinel
 - Logo image upload, then stored as Asset `extraMetadata("logoURI")`
 - Generated metadata JSON link for the token `contractURI`
-- Bootstrap role grants for mint, burn, pause and metadata controls
+- Bootstrap permission setup for mint, burn, pause and metadata controls
 - Initial supply minted during the factory creation transaction
 
 **Dashboard**
 
 - Factory-created token detection
-- Supply, balance, cap, decimals and role overview
+- Supply, balance, cap, decimals and permission overview
 - Single mint and batch mint through native B20 methods
 - Supply cap update
 - Granular pause for transfer, mint and burn features
 - Metadata updates for name, symbol, metadata JSON and logo image
-- Role grant, revoke and renounce controls
-- `renounceLastAdmin()` path for a permanent admin-less token
+- Give and remove permission controls
+- Final admin lock path for a permanent admin-less token
 - Transfer with bytes32 memo
 - Copy import info plus BaseScan token and factory links
 
@@ -97,6 +97,9 @@ Do not use `VITE_` for secrets. Vite exposes `VITE_` variables to browser code.
 Native B20 tokens do not require user Solidity source verification. The user
 calls the Base B20 Factory precompile, and the token is created by Base's native
 implementation. The dashboard links to the BaseScan token page and factory page.
+If BaseScan shows Similar Match, constructor, or compiler warnings on the
+Contract Code tab, treat that as BaseScan's matched implementation view, not a
+failed B20 launch.
 
 ## Security Notes
 
@@ -104,10 +107,10 @@ implementation. The dashboard links to the BaseScan token page and factory page.
 - Creation validates Asset decimals, supply math, cap bounds and metadata URI
   shape before sending the factory call.
 - Minting always respects the native B20 supply cap.
-- Role grants are visible on-chain. Treat DEFAULT_ADMIN_ROLE, MINT_ROLE,
+- Permission grants are visible on-chain. Treat DEFAULT_ADMIN_ROLE, MINT_ROLE,
   BURN_ROLE, PAUSE_ROLE, UNPAUSE_ROLE and METADATA_ROLE as real admin power.
-- `renounceLastAdmin()` is permanent. Use it only when no future admin changes
-  are needed.
+- Final admin lock is permanent. Use it only when no future admin changes are
+  needed.
 - The app follows the documented B20 surfaces, but it is not a legal, financial
   or formal audit guarantee.
 

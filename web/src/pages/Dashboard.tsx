@@ -98,14 +98,14 @@ const tones = {
 };
 
 const ROLE_HELP: Record<RoleKey, string> = {
-  DEFAULT_ADMIN_ROLE: "Can grant and revoke roles, update cap and make final admin decisions.",
-  MINT_ROLE: "Can create more supply. Use only while future minting is part of the plan.",
-  BURN_ROLE: "Can burn tokens from its own balance and use burn memo functions.",
-  BURN_BLOCKED_ROLE: "Advanced role for policy-blocked account burn flows.",
+  DEFAULT_ADMIN_ROLE: "Full admin permission. Can give or remove permissions and change supply cap.",
+  MINT_ROLE: "Can create more tokens later. Useful for admin, but buyers may see it as supply risk.",
+  BURN_ROLE: "Can burn tokens from its own wallet and add burn memos.",
+  BURN_BLOCKED_ROLE: "Advanced permission for policy-blocked burn flows.",
   PAUSE_ROLE: "Can pause transfers, minting or burning during emergencies.",
   UNPAUSE_ROLE: "Can turn paused features back on.",
-  METADATA_ROLE: "Can update name, symbol, metadata JSON link and logo image link.",
-  OPERATOR_ROLE: "Advanced role. Most tokens should leave this unused.",
+  METADATA_ROLE: "Can update name, symbol, metadata JSON and logo image.",
+  OPERATOR_ROLE: "Advanced permission. Most tokens should leave this unused.",
 };
 
 const VISIBLE_ROLE_OPTIONS = ROLE_OPTIONS.filter(
@@ -373,13 +373,13 @@ export function Dashboard() {
 
       {!isConnected && (
         <Card className="mb-5 flex flex-col items-center gap-3 border-sky-200/80 bg-sky-50/60 p-5 text-center dark:border-sky-400/20 dark:bg-sky-400/[0.07] sm:flex-row sm:justify-between sm:text-left">
-          <p className="text-sm text-muted">Connect a wallet to see your roles and use B20 controls.</p>
+          <p className="text-sm text-muted">Connect a wallet to see your permissions and use B20 controls.</p>
           <WalletConnect />
         </Card>
       )}
 
       <Callout tone="positive" icon={<IconInfo className="h-4 w-4" />} title="Native B20 on Base mainnet">
-        No Solidity source upload is needed for this token. Share the BaseScan token page and dashboard link after launch.
+        No Solidity source upload is needed. If BaseScan shows a compiler warning under Contract Code, it is from BaseScan's matched implementation view, not your token settings.
       </Callout>
 
       <TxChainProvider chainId={targetChainId}>
@@ -585,7 +585,7 @@ function SupplyCapPanel({ token, refetch }: Ctx) {
     >
       <div className="space-y-4">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          For a fixed-supply token, set cap equal to current total supply and remove MINT_ROLE from the Roles panel.
+          For a fixed-supply token, set cap equal to current total supply and remove Mint permission from Admin permissions.
         </Callout>
         <div className="grid gap-3 sm:grid-cols-2">
           <Metric label="Current cap" value={capLabel(token)} />
@@ -765,25 +765,26 @@ function RolesPanel({ token, connected, refetch }: Ctx) {
   const [roleKey, setRoleKey] = useState<RoleKey>("MINT_ROLE");
   const role = B20_ROLES[roleKey];
   const validAccount = isAddress(account);
+  const selectedRoleLabel = VISIBLE_ROLE_OPTIONS.find((option) => option.key === roleKey)?.label ?? "Permission";
 
   return (
     <SectionCard
       icon={<IconLock className="h-5 w-5" />}
-      title="Roles"
-      desc="B20 uses role-based access control instead of a classic owner."
+      title="Admin permissions"
+      desc="Give wallets only the powers they need."
       className={tones.roles.card}
       iconClassName={tones.roles.icon}
     >
       <div className="space-y-4">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Roles replace the classic owner model. Grant roles only to wallets you control, and avoid renouncing the last admin until the token should be permanently admin-less.
+          Permissions control what each wallet can do. Give powers only to trusted wallets. Lock final admin only when the token should never be managed again.
         </Callout>
-        {!isAdmin && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Connected wallet does not hold DEFAULT_ADMIN_ROLE.</Callout>}
+        {!isAdmin && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Your connected wallet is not an admin, so it cannot change permissions.</Callout>}
         <div className="grid gap-3 sm:grid-cols-[1fr_170px]">
-          <Field label="Account">
+          <Field label="Wallet address">
             <Input value={account} onChange={(e) => setAccount(e.target.value.trim())} placeholder="0x..." className="font-mono text-xs" disabled={!isAdmin} />
           </Field>
-          <Field label="Role">
+          <Field label="Permission">
             <select
               value={roleKey}
               onChange={(e) => setRoleKey(e.target.value as RoleKey)}
@@ -797,20 +798,20 @@ function RolesPanel({ token, connected, refetch }: Ctx) {
           </Field>
         </div>
         <div className="rounded-xl border border-rose-200/70 bg-surface/70 px-4 py-3 text-xs leading-relaxed text-muted dark:border-rose-400/20">
-          <strong className="text-fg">{VISIBLE_ROLE_OPTIONS.find((option) => option.key === roleKey)?.label}</strong>: {ROLE_HELP[roleKey]}
+          <strong className="text-fg">{selectedRoleLabel}</strong>: {ROLE_HELP[roleKey]}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <TxButton disabled={!isAdmin || !validAccount} build={() => ({ address: token.address, abi: B20_ABI, functionName: "grantRole", args: [role, account as `0x${string}`] })} onSuccess={refetch}>
-            Grant
+            Give permission
           </TxButton>
           <TxButton variant="outline" disabled={!isAdmin || !validAccount} build={() => ({ address: token.address, abi: B20_ABI, functionName: "revokeRole", args: [role, account as `0x${string}`] })} onSuccess={refetch}>
-            Revoke
+            Remove permission
           </TxButton>
         </div>
         <div className="rounded-xl border border-rose-200/70 bg-rose-50/70 p-4 dark:border-rose-400/20 dark:bg-rose-400/[0.07]">
-          <p className="text-sm font-medium">Admin renunciation</p>
+          <p className="text-sm font-medium">Remove powers from my wallet</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            Renounce last admin permanently removes the final admin wallet. Other granted roles keep working, but admin powers cannot be restored.
+            Use this only for your connected wallet. For another wallet, paste its address above and use Remove permission.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <TxButton
@@ -818,20 +819,23 @@ function RolesPanel({ token, connected, refetch }: Ctx) {
               disabled={!connected || !token.roles[roleKey]}
               build={() => connected ? { address: token.address, abi: B20_ABI, functionName: "renounceRole", args: [role, connected] } : null}
               onSuccess={refetch}
-              confirmLabel="Renounce this role from your connected wallet?"
+              confirmLabel={`Remove ${selectedRoleLabel} permission from your connected wallet?`}
             >
-              Renounce selected role
+              Remove from me
             </TxButton>
             <TxButton
               variant="danger"
               disabled={!isAdmin}
               build={() => ({ address: token.address, abi: B20_ABI, functionName: "renounceLastAdmin", args: [] })}
               onSuccess={refetch}
-              confirmLabel="Permanently renounce the final admin role? This cannot be undone."
+              confirmLabel="Lock final admin forever? This cannot be undone."
             >
-              Renounce last admin
+              Lock admin forever
             </TxButton>
           </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Final admin lock only works when your wallet is the last admin. After that, admin powers cannot be restored.
+          </p>
         </div>
       </div>
     </SectionCard>
@@ -890,14 +894,17 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
   return (
     <SectionCard
       icon={<IconExternal className="h-5 w-5" />}
-      title="BaseScan publish"
+      title="BaseScan sharing"
       desc="Open and share the public token page."
       className={tones.picker.card}
       iconClassName={tones.picker.icon}
     >
       <div className="space-y-3">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          If BaseScan shows a contract-source warning, do not treat it as a failed launch. For native B20, the token page, holders and transfers tabs are the public view.
+          Use the token page, holders and transfers tabs for sharing. You do not need to use the Contract Code tab for native B20.
+        </Callout>
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
+          BaseScan may show Similar Match, constructor, or compiler warnings for the matched implementation. That warning is not caused by your launch settings and does not mean your B20 token failed.
         </Callout>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
           Share the token address or token page. For logo and socials, update metadata here and submit token info to explorer or wallet indexers if they require manual review.
@@ -905,7 +912,7 @@ function BaseScanPanel({ token, chainId }: { token: TokenView; chainId: Supporte
         <div className="grid gap-2 sm:grid-cols-2">
           <a href={`${explorerUrl(chainId)}/token/${token.address}`} target="_blank" rel="noreferrer">
             <Button variant="outline" fullWidth className="gap-2">
-              Token page <IconExternal className="h-4 w-4" />
+              Public token page <IconExternal className="h-4 w-4" />
             </Button>
           </a>
           <a href={`${explorerUrl(chainId)}/address/${B20_FACTORY_ADDRESS}`} target="_blank" rel="noreferrer">

@@ -76,9 +76,9 @@ const toneStyles: Record<Tone, { card: string; badge: string; icon: string; rule
 
 const quickLinks = [
   { title: "Create", copy: "Launch a native B20 Asset token on Base mainnet.", icon: <IconRocket className="h-5 w-5" />, to: "/create", tone: "sky" as Tone },
-  { title: "Manage", copy: "Mint, burn, update logo and manage roles.", icon: <IconGauge className="h-5 w-5" />, to: "/dashboard", tone: "mint" as Tone },
+  { title: "Manage", copy: "Mint, burn, update logo and manage permissions.", icon: <IconGauge className="h-5 w-5" />, to: "/dashboard", tone: "mint" as Tone },
   { title: "Base docs", copy: "Official launch guide and standard reference.", icon: <IconExternal className="h-5 w-5" />, to: "https://docs.base.org/get-started/launch-b20-token", tone: "amber" as Tone },
-  { title: "Safety", copy: "Understand admin powers before renouncing roles.", icon: <IconShield className="h-5 w-5" />, to: "#security", tone: "rose" as Tone },
+  { title: "Safety", copy: "Understand admin powers before locking them.", icon: <IconShield className="h-5 w-5" />, to: "#security", tone: "rose" as Tone },
 ];
 
 const SECTIONS: Section[] = [
@@ -155,11 +155,11 @@ const SECTIONS: Section[] = [
             ["Salt", "Randomized per launch for deterministic B20 address derivation"],
             ["Initial admin", "Connected wallet receives DEFAULT_ADMIN_ROLE"],
             ["Supply cap", `Maximum allowed cap is ${MAX_UINT128.toString()}`],
-            ["Initial supply", "Created during launch after cap and roles are configured"],
+            ["Initial supply", "Created during launch after cap and permissions are configured"],
           ]}
         />
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Factory initCalls run during token creation. They can configure cap, roles, metadata and the first mint
+          Factory initCalls run during token creation. They can configure cap, permissions, metadata and the first mint
           atomically, while B20 invariants such as supply cap still apply.
         </Callout>
       </>
@@ -167,30 +167,29 @@ const SECTIONS: Section[] = [
   },
   {
     id: "roles",
-    title: "Roles",
-    eyebrow: "Access Control",
-    summary: "B20 uses fixed roles, not a single owner model.",
+    title: "Admin Permissions",
+    eyebrow: "Access",
+    summary: "B20 permissions decide what each wallet can do.",
     tone: "rose",
     icon: <IconLock className="h-5 w-5" />,
     body: (
       <>
         <InfoGrid
           rows={[
-            ["DEFAULT_ADMIN_ROLE", "Grants and revokes roles, updates supply cap and policies"],
-            ["MINT_ROLE", "Can mint and mintWithMemo"],
-            ["BURN_ROLE", "Can burn and burnWithMemo from its own balance"],
-            ["PAUSE_ROLE", "Can pause selected features"],
-            ["UNPAUSE_ROLE", "Can unpause selected features"],
-            ["METADATA_ROLE", "Can update name, symbol, metadata JSON link and logo image link"],
+            ["Admin", "Can give or remove permissions and update supply cap"],
+            ["Mint", "Can create more tokens later"],
+            ["Burn", "Can burn tokens from its own wallet"],
+            ["Pause", "Can pause transfers, minting or burning during emergencies"],
+            ["Unpause", "Can turn paused features back on"],
+            ["Metadata", "Can update name, symbol, metadata JSON and logo image"],
           ]}
         />
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          B20 also has advanced roles such as BURN_BLOCKED_ROLE and OPERATOR_ROLE. The dashboard hides them from the
-          normal role picker because most public tokens do not need those controls.
+          B20 also has advanced permissions such as BURN_BLOCKED_ROLE and OPERATOR_ROLE. The dashboard hides them from the
+          normal permission picker because most public tokens do not need those controls.
         </Callout>
-        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />} title="Last admin rule">
-          The final DEFAULT_ADMIN_ROLE holder cannot be removed with normal revoke or renounceRole. B20 uses
-          <Code>renounceLastAdmin()</Code> for the permanent admin-less transition.
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />} title="Final admin lock">
+          Lock final admin only when the token should never be managed again. After that, admin powers cannot be restored.
         </Callout>
       </>
     ),
@@ -205,15 +204,15 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <Ol>
-          <li><b>Mint and batch mint.</b> Requires MINT_ROLE and cannot exceed the configured supply cap.</li>
-          <li><b>Supply cap.</b> Requires DEFAULT_ADMIN_ROLE. It can move up or down, but not below totalSupply.</li>
-          <li><b>Burn.</b> Requires BURN_ROLE, removes tokens from the connected wallet, and lowers totalSupply permanently.</li>
+          <li><b>Mint and batch mint.</b> Requires Mint permission and cannot exceed the configured supply cap.</li>
+          <li><b>Supply cap.</b> Requires Admin permission. It can move up or down, but not below totalSupply.</li>
+          <li><b>Burn.</b> Requires Burn permission, removes tokens from the connected wallet, and lowers totalSupply permanently.</li>
           <li><b>Pause features.</b> Transfers, minting and burning are independently pausable.</li>
           <li><b>Metadata.</b> Update name, symbol, metadata JSON link and logo image link.</li>
-          <li><b>Roles.</b> Grant, revoke and renounce built-in roles from the dashboard.</li>
+          <li><b>Admin permissions.</b> Give permissions, remove permissions and lock final admin from the dashboard.</li>
           <li><b>Memo transfer.</b> Send normal token transfers with an optional bytes32 memo.</li>
           <li><b>Copy import info.</b> Copy address, symbol, decimals and logo URL for custom token import.</li>
-          <li><b>BaseScan publish.</b> Open token, factory and share links from the dashboard without classic source verification.</li>
+          <li><b>BaseScan sharing.</b> Open token, factory and share links from the dashboard without classic source verification.</li>
         </Ol>
         <Callout tone="positive" icon={<IconCheck className="h-4 w-4" />}>
           The dashboard no longer includes trade fees, DEX-pair registration, custom denylist controls, or
@@ -265,7 +264,7 @@ const SECTIONS: Section[] = [
         </P>
         <P>
           New tokens default to the built-in always-allow policy unless a policy is intentionally configured. This app
-          currently creates open Asset tokens by default and exposes role, pause, supply and metadata controls first.
+          currently creates open Asset tokens by default and exposes permission, pause, supply and metadata controls first.
         </P>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
           Policy IDs should be validated before assignment. Binding to the wrong ID can make a policy stricter or more
@@ -276,8 +275,8 @@ const SECTIONS: Section[] = [
   },
   {
     id: "publish",
-    title: "BaseScan Publish",
-    eyebrow: "Verification",
+    title: "BaseScan Sharing",
+    eyebrow: "Public Page",
     summary: "Native B20 tokens do not require user Solidity source verification.",
     tone: "lime",
     icon: <IconExternal className="h-5 w-5" />,
@@ -289,13 +288,16 @@ const SECTIONS: Section[] = [
           Base's native implementation.
         </P>
         <P>
-          For users, the correct publish path is to open the token page on BaseScan and share the token address. The
+          For users, the correct sharing path is to open the token page on BaseScan and share the token address. The
           dashboard links directly to the token page and the factory page.
         </P>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          If BaseScan's Contract tab shows a Similar Match or constructor warning, do not treat it as a failed launch.
+          If BaseScan's Contract Code tab shows a Similar Match, constructor, or compiler warning, do not treat it as a failed launch.
           Native B20 tokens use Base's shared implementation, so the token page, holders, transfers and info tabs are
           the right public view.
+        </Callout>
+        <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
+          That warning is from BaseScan's matched implementation view. It is not caused by your launch form choices.
         </Callout>
         <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>
           Wallet and explorer logos may be cached by external indexers. Save logo image and Metadata JSON on-chain, then
@@ -306,21 +308,21 @@ const SECTIONS: Section[] = [
   },
   {
     id: "security",
-    title: "Security Checklist",
+    title: "Trust Checklist",
     eyebrow: "Before Launch",
-    summary: "Use B20 roles carefully and keep admin powers transparent.",
+    summary: "Use B20 permissions carefully and keep admin powers transparent.",
     tone: "rose",
     icon: <IconShield className="h-5 w-5" />,
     body: (
       <>
         <Ol>
-          <li>Use a wallet you control for initial DEFAULT_ADMIN_ROLE.</li>
-          <li>Grant MINT_ROLE only while minting is required.</li>
+          <li>Use a wallet you control as the first admin.</li>
+          <li>Keep Mint permission only while future minting is required.</li>
           <li>Keep supply cap at or above planned maximum supply.</li>
-          <li>Grant pause roles only to wallets that should handle emergencies.</li>
+          <li>Keep Pause permission only for wallets that should handle emergencies.</li>
           <li>Set Metadata JSON and logo image before sharing the token publicly.</li>
           <li>Use the dashboard BaseScan and Copy import info actions after launch so users can open the correct token.</li>
-          <li>Renounce the final admin only when no future admin updates are needed.</li>
+          <li>Lock final admin only when no future admin updates are needed.</li>
         </Ol>
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
           This app helps enforce B20 input constraints and uses the native standard. It is not a legal, financial or
