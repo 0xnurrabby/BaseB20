@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "sharp": "^0.35.3",
     "viem": "^2.54.6"
   }
 }

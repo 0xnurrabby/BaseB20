@@ -1,5 +1,6 @@
 const { readJson, send } = require("./_http");
 const { pinataCredentials, pinMetadataWithFallback } = require("./_pinata");
+const { optimizeLogoImage } = require("./_optimize-image");
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -50,12 +51,15 @@ async function imageFromPayload(payload, tokenName) {
 
   if (base64) {
     if (!/^[A-Za-z0-9+/=]+$/.test(base64)) throw new Error("Invalid image data.");
-    if (!ACCEPTED_IMAGE_TYPES.has(type)) throw new Error("Unsupported image type. Use PNG, JPG, GIF or WEBP.");
+    if (type && !ACCEPTED_IMAGE_TYPES.has(type) && !String(type).startsWith("image/")) {
+      throw new Error("Unsupported image type. Use PNG, JPG, GIF or WEBP.");
+    }
     if (decodedBase64Bytes(base64) > MAX_IMAGE_BYTES) throw new Error("Image is too large. Keep it under 3 MB.");
+    const optimized = await optimizeLogoImage(Buffer.from(base64, "base64"), type || "image/png");
     return {
-      bytes: Buffer.from(base64, "base64"),
-      type,
-      filename: `${name}.${extensionFor(type)}`,
+      bytes: optimized.bytes,
+      type: optimized.type,
+      filename: `${name}.${optimized.ext}`,
     };
   }
 
@@ -79,14 +83,17 @@ async function imageFromPayload(payload, tokenName) {
   const upstream = await fetch(url, { headers: { accept: "image/png,image/jpeg,image/gif,image/webp,*/*" } });
   if (!upstream.ok) throw new Error(`Could not fetch image (${upstream.status}).`);
   const upstreamType = String(upstream.headers.get("content-type") || "").split(";")[0].toLowerCase();
-  if (!ACCEPTED_IMAGE_TYPES.has(upstreamType)) throw new Error("Image URL did not return PNG, JPG, GIF or WEBP.");
+  if (upstreamType && !ACCEPTED_IMAGE_TYPES.has(upstreamType) && !upstreamType.startsWith("image/")) {
+    throw new Error("Image URL did not return PNG, JPG, GIF or WEBP.");
+  }
   const bytes = Buffer.from(await upstream.arrayBuffer());
   if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error("Image is too large. Keep it under 3 MB.");
+  const optimized = await optimizeLogoImage(bytes, upstreamType || "image/png");
 
   return {
-    bytes,
-    type: upstreamType,
-    filename: `${name}.${extensionFor(upstreamType)}`,
+    bytes: optimized.bytes,
+    type: optimized.type,
+    filename: `${name}.${optimized.ext}`,
   };
 }
 

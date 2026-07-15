@@ -1,3 +1,5 @@
+import { optimizeLogoFile } from "./optimize-image";
+
 export interface UploadTokenMetadataInput {
   name: string;
   symbol: string;
@@ -34,9 +36,10 @@ export async function uploadTokenMetadata(input: UploadTokenMetadataInput): Prom
   };
 
   if (input.imageFile) {
-    body.imageBase64 = await fileToBase64(input.imageFile);
-    body.imageType = input.imageFile.type;
-    body.imageName = input.imageFile.name;
+    const optimized = await optimizeLogoFile(input.imageFile);
+    body.imageBase64 = await fileToBase64(optimized);
+    body.imageType = optimized.type;
+    body.imageName = optimized.name;
   }
 
   const res = await fetch("/api/ipfs-metadata", {

@@ -1,5 +1,6 @@
 const { pinFileWithFallback } = require("./_pinata");
 const { readJson, send } = require("./_http");
+const { optimizeLogoImage } = require("./_optimize-image");
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -7,13 +8,6 @@ const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "i
 function decodedBase64Bytes(value) {
   const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
   return Math.floor((value.length * 3) / 4) - padding;
-}
-
-function extensionFor(type) {
-  if (type === "image/jpeg") return "jpg";
-  if (type === "image/gif") return "gif";
-  if (type === "image/webp") return "webp";
-  return "png";
 }
 
 function safeName(value) {
@@ -48,7 +42,7 @@ module.exports = async function handler(req, res) {
   if (decodedBase64Bytes(image) > MAX_IMAGE_BYTES) {
     return send(res, 400, { error: "Image is too large. Keep it under 3 MB." });
   }
-  if (!ACCEPTED_IMAGE_TYPES.has(type)) {
+  if (type && !ACCEPTED_IMAGE_TYPES.has(type) && !String(type).startsWith("image/")) {
     return send(res, 400, { error: "Unsupported file type. Use PNG, JPG, GIF or WEBP." });
   }
   if (!Number.isFinite(size) || size <= 0 || size > MAX_IMAGE_BYTES) {
@@ -56,19 +50,22 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const optimized = await optimizeLogoImage(Buffer.from(image, "base64"), type || "image/png");
     const pinned = await pinFileWithFallback({
-      bytes: Buffer.from(image, "base64"),
-      type,
-      filename: `${name}.${extensionFor(type)}`,
+      bytes: optimized.bytes,
+      type: optimized.type,
+      filename: `${name}.${optimized.ext}`,
       name,
     });
-    // Store pure ipfs:// on-chain / in forms (same as o1). App UI proxies for display.
     return send(res, 200, {
       url: `ipfs://${pinned.cid}`,
       ipfsUri: `ipfs://${pinned.cid}`,
       gatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.cid}`,
       displayUrl: `https://base.nurlab.xyz/api/logo-image?cid=${encodeURIComponent(pinned.cid)}`,
       pinataKey: pinned.credentialLabel,
+      bytes: optimized.bytes.byteLength,
+      optimized: optimized.optimized,
+      contentType: optimized.type,
     });
   } catch (error) {
     return send(res, 400, { error: error instanceof Error ? error.message : "IPFS image upload failed." });
