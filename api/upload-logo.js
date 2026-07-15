@@ -62,14 +62,12 @@ module.exports = async function handler(req, res) {
       filename: `${name}.${extensionFor(type)}`,
       name,
     });
-    // Permanent HTTPS logo URL served by this app (proxies IPFS server-side).
-    const publicOrigin = process.env.PUBLIC_APP_URL || "https://base.nurlab.xyz";
-    const displayUrl = `${publicOrigin.replace(/\/$/, "")}/api/logo-image?cid=${encodeURIComponent(pinned.cid)}`;
+    // Store pure ipfs:// on-chain / in forms (same as o1). App UI proxies for display.
     return send(res, 200, {
-      url: displayUrl,
+      url: `ipfs://${pinned.cid}`,
       ipfsUri: `ipfs://${pinned.cid}`,
       gatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.cid}`,
-      displayUrl,
+      displayUrl: `https://base.nurlab.xyz/api/logo-image?cid=${encodeURIComponent(pinned.cid)}`,
       pinataKey: pinned.credentialLabel,
     });
   } catch (error) {

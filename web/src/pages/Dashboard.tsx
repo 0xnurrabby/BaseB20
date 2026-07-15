@@ -40,8 +40,8 @@ import {
 import { TokenLogo } from "../components/TokenLogo";
 import { AddToWalletButton } from "../components/AddToWalletButton";
 import { LogoPicker } from "../components/LogoPicker";
-import { buildTokenMetadataUri } from "../lib/metadata";
-import { logoUrlError } from "../lib/image-url";
+import { logoUrlError, extractCid, pinataGatewayUrl } from "../lib/image-url";
+import { uploadTokenMetadata } from "../lib/ipfs";
 
 type RoleKey = keyof typeof B20_ROLES;
 
@@ -211,6 +211,33 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token?.address, token?.name, token?.symbol, token?.logoURI, targetChainId]);
 
+  const [contractImage, setContractImage] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const baseLogo = token?.logoURI || savedToken?.logoURI || "";
+      if (baseLogo || !token?.contractURI) {
+        if (!cancelled) setContractImage("");
+        return;
+      }
+      const cid = extractCid(token.contractURI);
+      if (!cid) return;
+      try {
+        const res = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as { image?: string; logoURI?: string };
+        const image = (json.image || json.logoURI || "").trim();
+        if (!cancelled) setContractImage(image);
+      } catch {
+        if (!cancelled) setContractImage("");
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [token?.logoURI, token?.contractURI, savedToken?.logoURI]);
+
   function openToken(addr: string) {
     if (isAddressLike(addr)) navigate(`/dashboard/${addr}`);
   }
@@ -320,7 +347,10 @@ export function Dashboard() {
     );
   }
 
-  const visibleToken = token.logoURI || !savedToken?.logoURI ? token : { ...token, logoURI: savedToken.logoURI };
+  const visibleToken = {
+    ...token,
+    logoURI: token.logoURI || savedToken?.logoURI || contractImage || "",
+  };
   const dashboardLink = typeof window !== "undefined" ? `${window.location.origin}/dashboard/${visibleToken.address}` : "";
   const ctx: Ctx = { token: visibleToken, chainId: targetChainId, connected, refetch };
   const roleBadges = VISIBLE_ROLE_OPTIONS.filter((r) => visibleToken.roles[r.key as RoleKey]).map((r) => r.label);
@@ -673,6 +703,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
   const [contractURI, setContractURI] = useState(token.contractURI);
   const [logoURI, setLogoURI] = useState(token.logoURI);
   const [logoDirty, setLogoDirty] = useState(false);
+  const [resolvedFromContract, setResolvedFromContract] = useState("");
 
   useEffect(() => {
     setName(token.name);
@@ -680,6 +711,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     setContractURI(token.contractURI);
     setLogoURI(token.logoURI);
     setLogoDirty(false);
+    setResolvedFromContract("");
   }, [token.address]);
 
   useEffect(() => {
@@ -688,6 +720,32 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     setContractURI(token.contractURI);
     if (!logoDirty) setLogoURI(token.logoURI);
   }, [token.name, token.symbol, token.contractURI, token.logoURI, logoDirty]);
+
+  // o1-style tokens often leave logoURI empty and only set contractURI metadata.image
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFromContractUri() {
+      if (token.logoURI || !token.contractURI) {
+        setResolvedFromContract("");
+        return;
+      }
+      const cid = extractCid(token.contractURI);
+      if (!cid) return;
+      try {
+        const res = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as { image?: string; logoURI?: string };
+        const image = (json.image || json.logoURI || "").trim();
+        if (!cancelled && image) setResolvedFromContract(image);
+      } catch {
+        // ignore
+      }
+    }
+    loadFromContractUri();
+    return () => {
+      cancelled = true;
+    };
+  }, [token.logoURI, token.contractURI]);
 
   function setLogo(next: string) {
     setLogoDirty(true);
@@ -705,9 +763,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
   }
 
   const logoError = logoUrlError(logoURI);
-  const suggestedContractURI = logoURI.trim() && !logoError
-    ? buildTokenMetadataUri({ name: name || token.name, symbol: symbol || token.symbol, image: logoURI })
-    : "";
+  const previewLogo = logoURI || resolvedFromContract || token.logoURI;
 
   return (
     <SectionCard
@@ -719,15 +775,15 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
     >
       <div className="space-y-4">
         <Callout tone="neutral" icon={<IconInfo className="h-4 w-4" />}>
-          Upload a logo, then save logo and JSON together. Wallets usually read the JSON link first.
+          Save pins logo + metadata JSON to IPFS (same pattern BaseScan and Base app use).
         </Callout>
         {!canMetadata && <Callout tone="warn" icon={<IconAlert className="h-4 w-4" />}>Connected wallet does not hold METADATA_ROLE.</Callout>}
         <div className="flex items-center gap-3 rounded-xl border border-violet-200/70 bg-surface/75 px-4 py-3 dark:border-violet-400/20">
-          <TokenLogo src={logoURI} symbol={symbol || token.symbol} size="lg" tone="violet" />
+          <TokenLogo src={previewLogo} symbol={symbol || token.symbol} size="lg" tone="violet" />
           <div className="min-w-0">
             <p className="text-sm font-medium">Logo preview</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              Save the logo image on-chain so this dashboard, metadata JSON and explorers can read it.
+              BaseScan reads contractURI metadata JSON image field (ipfs://), not a random HTTPS link.
             </p>
           </div>
         </div>
@@ -745,42 +801,49 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
             </div>
           </Field>
         </div>
-        <Field label="Metadata JSON link" hint="Use the generated JSON after the logo image is saved. Manual link is optional.">
+        <Field label="Metadata JSON (contractURI)" hint="Must be ipfs://... for BaseScan and Base app logos.">
           <div className="flex gap-2">
-            <Input value={contractURI} onChange={(e) => setContractURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
+            <Input value={contractURI} onChange={(e) => setContractURI(e.target.value.trim())} placeholder="ipfs://..." disabled={!canMetadata} />
             <TxButton variant="secondary" disabled={!canMetadata || contractURI === token.contractURI} build={() => ({ address: token.address, abi: B20_ABI, functionName: "updateContractURI", args: [contractURI.trim()] })} onSuccess={refetch}>Save</TxButton>
           </div>
-        </Field>
-        {suggestedContractURI && (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="secondary" disabled={!canMetadata} onClick={() => setContractURI(suggestedContractURI)}>
-              Use generated JSON
-            </Button>
-            <a href={suggestedContractURI} target="_blank" rel="noreferrer">
-              <Button type="button" size="sm" variant="outline">
-                Preview JSON <IconExternal className="h-3.5 w-3.5" />
-              </Button>
+          {contractURI.startsWith("ipfs://") && extractCid(contractURI) && (
+            <a
+              href={pinataGatewayUrl(contractURI)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-xs text-muted hover:text-fg"
+            >
+              Preview JSON <IconExternal className="h-3.5 w-3.5" />
             </a>
-          </div>
-        )}
+          )}
+        </Field>
         <Field
           label="Logo image"
           error={logoError}
-          hint="Upload pins the image to IPFS. If pasting manually, use a direct https:// image link or ipfs:// URI."
+          hint="Choose image, then Save. Pins image + JSON to IPFS and writes both on-chain."
         >
           <LogoPicker value={logoURI} onChange={setLogo} symbol={symbol || token.symbol} disabled={!canMetadata} />
           <div className="mt-3 flex gap-2">
-            <Input value={logoURI} onChange={(e) => setLogo(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
+            <Input value={logoURI} onChange={(e) => setLogo(e.target.value.trim())} placeholder="ipfs://..." disabled={!canMetadata} />
             <MetadataSyncButton
               token={token}
               chainId={chainId}
+              name={name || token.name}
+              symbol={symbol || token.symbol}
               logoURI={logoURI}
-              metadataURI={suggestedContractURI}
               disabled={!canMetadata || !!logoError || !logoURI.trim()}
-              onSuccess={() => {
+              onSuccess={(result) => {
                 setLogoDirty(false);
-                saveToken({ address: token.address, name: token.name, symbol: token.symbol, chainId, createdAt: Date.now(), logoURI: logoURI.trim() });
-                setContractURI(suggestedContractURI || contractURI);
+                setLogoURI(result.logoURI);
+                setContractURI(result.contractURI);
+                saveToken({
+                  address: token.address,
+                  name: token.name,
+                  symbol: token.symbol,
+                  chainId,
+                  createdAt: Date.now(),
+                  logoURI: result.logoURI,
+                });
                 refetch();
               }}
             />
@@ -794,42 +857,35 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
 function MetadataSyncButton({
   token,
   chainId,
+  name,
+  symbol,
   logoURI,
-  metadataURI,
   disabled,
   onSuccess,
 }: {
   token: TokenView;
   chainId: SupportedChainId;
+  name: string;
+  symbol: string;
   logoURI: string;
-  metadataURI: string;
   disabled?: boolean;
-  onSuccess: () => void;
+  onSuccess: (result: { logoURI: string; contractURI: string }) => void;
 }) {
   const walletChainId = useChainId();
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const [queue, setQueue] = useState<Array<"logo" | "json">>([]);
-  const [active, setActive] = useState<"logo" | "json" | "done" | null>(null);
+  const [active, setActive] = useState<"logo" | "json" | "pin" | "done" | null>(null);
   const [handledHash, setHandledHash] = useState<`0x${string}` | undefined>();
   const [localError, setLocalError] = useState("");
+  const [pending, setPending] = useState<{ logoURI: string; contractURI: string } | null>(null);
   const { isLoading: mining, isSuccess } = useWaitForTransactionReceipt({ hash, chainId });
 
-  const cleanLogo = logoURI.trim();
-  const needsLogo = cleanLogo !== token.logoURI;
-  const needsJson = !!metadataURI && metadataURI !== token.contractURI;
-  const actions = useMemo(() => {
-    const next: Array<"logo" | "json"> = [];
-    if (needsLogo) next.push("logo");
-    if (needsJson) next.push("json");
-    return next;
-  }, [needsLogo, needsJson]);
-
-  function runAction(action: "logo" | "json") {
+  function runAction(action: "logo" | "json", values: { logoURI: string; contractURI: string }) {
     setActive(action);
     const req = action === "logo"
-      ? { functionName: "updateExtraMetadata", args: ["logoURI", cleanLogo] as const }
-      : { functionName: "updateContractURI", args: [metadataURI] as const };
+      ? { functionName: "updateExtraMetadata", args: ["logoURI", values.logoURI] as const }
+      : { functionName: "updateContractURI", args: [values.contractURI] as const };
     writeContract({
       chainId,
       address: token.address,
@@ -841,20 +897,22 @@ function MetadataSyncButton({
   }
 
   useEffect(() => {
-    if (!isSuccess || !hash || hash === handledHash || !active) return;
+    if (!isSuccess || !hash || hash === handledHash || !active || !pending) return;
+    if (active === "pin") return;
     setHandledHash(hash);
     const remaining = queue.slice(1);
     if (remaining.length > 0) {
       setQueue(remaining);
-      runAction(remaining[0]);
+      runAction(remaining[0], pending);
       return;
     }
     setQueue([]);
     setActive("done");
     setLocalError("");
-    onSuccess();
+    onSuccess(pending);
     const t = setTimeout(() => {
       setActive(null);
+      setPending(null);
       reset();
     }, 1800);
     return () => clearTimeout(t);
@@ -865,24 +923,49 @@ function MetadataSyncButton({
     if (!error) return;
     setQueue([]);
     setActive(null);
+    setPending(null);
   }, [error]);
 
   async function onClick() {
-    if (actions.length === 0) return;
     setLocalError("");
     reset();
     setHandledHash(undefined);
-    setQueue(actions);
+    setActive("pin");
     try {
       if (walletChainId !== chainId) {
         await switchChainAsync({ chainId });
       }
-      runAction(actions[0]);
-    } catch (switchError) {
-      const message = switchError instanceof Error ? switchError.message : "Network switch failed.";
-      setLocalError(message.includes("User rejected") ? "Network switch rejected." : `Switch to ${chainName(chainId)} and try again.`);
+      // Pin like o1: image ipfs:// + metadata JSON with image field, contractURI = ipfs://metadata
+      const uploaded = await uploadTokenMetadata({
+        name,
+        symbol,
+        imageUrl: logoURI.trim(),
+      });
+      const values = {
+        logoURI: uploaded.logoURI || logoURI.trim(),
+        contractURI: uploaded.contractURI,
+      };
+      setPending(values);
+      const actions: Array<"logo" | "json"> = [];
+      if (values.logoURI && values.logoURI !== token.logoURI) actions.push("logo");
+      if (values.contractURI && values.contractURI !== token.contractURI) actions.push("json");
+      if (actions.length === 0) {
+        setActive("done");
+        onSuccess(values);
+        setTimeout(() => {
+          setActive(null);
+          setPending(null);
+        }, 1200);
+        return;
+      }
+      setQueue(actions);
+      runAction(actions[0], values);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Metadata pin failed.";
+      setLocalError(message.includes("User rejected") ? "Network switch rejected." : message.slice(0, 140));
       setQueue([]);
       setActive(null);
+      setPending(null);
     }
   }
 
@@ -894,19 +977,17 @@ function MetadataSyncButton({
     : "");
   const label = active === "done"
     ? "Done"
-    : active === "logo"
-      ? "Saving logo..."
-      : active === "json"
-        ? "Saving JSON..."
-        : needsLogo && needsJson
-          ? "Save logo + JSON"
-          : needsLogo
-            ? "Save logo"
-            : "Save JSON";
+    : active === "pin"
+      ? "Pinning IPFS..."
+      : active === "logo"
+        ? "Saving logo..."
+        : active === "json"
+          ? "Saving JSON..."
+          : "Save logo + JSON";
 
   return (
     <div className="shrink-0">
-      <Button type="button" variant={active === "done" ? "success" : "secondary"} loading={busy} disabled={disabled || busy || actions.length === 0} onClick={onClick} className="whitespace-nowrap">
+      <Button type="button" variant={active === "done" ? "success" : "secondary"} loading={busy} disabled={disabled || busy} onClick={onClick} className="whitespace-nowrap">
         {active === "done" && <IconCheck className="h-4 w-4" />}
         {label}
       </Button>
@@ -1046,10 +1127,8 @@ function TransferPanel({ token, connected, refetch }: Ctx) {
 }
 
 function BaseScanPanel({ token }: { token: TokenView }) {
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://base.nurlab.xyz";
-  const metadataURI = token.logoURI
-    ? buildTokenMetadataUri({ name: token.name, symbol: token.symbol, image: token.logoURI, origin })
-    : token.contractURI;
+  // Prefer on-chain contractURI (ipfs metadata JSON) - same source BaseScan uses.
+  const metadataURI = token.contractURI || token.logoURI;
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState("");
   const [publishResult, setPublishResult] = useState<{

@@ -68,7 +68,6 @@ export function ipfsCidPath(value: string) {
   return extractCid(value);
 }
 
-/** Permanent app-hosted logo URL for a CID. Works in browsers, wallets and explorers. */
 export function logoProxyUrl(cidOrUri: string, origin?: string) {
   const cid = extractCid(cidOrUri);
   if (!cid) return "";
@@ -77,7 +76,6 @@ export function logoProxyUrl(cidOrUri: string, origin?: string) {
   return url.toString();
 }
 
-/** Public Pinata gateway URL. */
 export function pinataGatewayUrl(value: string) {
   const cid = extractCid(value);
   return cid ? `https://gateway.pinata.cloud/ipfs/${cid}` : value.trim();
@@ -85,9 +83,7 @@ export function pinataGatewayUrl(value: string) {
 
 /**
  * Browser-safe logo URL for <img src>.
- * - blob/data pass through
- * - IPFS / gateway / proxy URLs normalize to same-origin /api/logo-image
- * - other https links pass through
+ * Converts ipfs:// to same-origin /api/logo-image proxy (BaseScan uses contractURI JSON instead).
  */
 export function displayLogoUrl(value?: string, origin?: string) {
   const text = value?.trim() || "";
@@ -109,21 +105,6 @@ export function displayLogoUrl(value?: string, origin?: string) {
   } catch {
     return "";
   }
-}
-
-/** Normalize any uploaded logo value to the permanent on-chain form. */
-export function normalizeLogoURI(value: string, origin?: string) {
-  const text = value.trim();
-  if (!text) return "";
-  const proxied = logoProxyUrl(text, origin);
-  if (proxied) return proxied;
-  try {
-    const url = new URL(text);
-    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
-  } catch {
-    // ignore
-  }
-  return text;
 }
 
 /** @deprecated use displayLogoUrl */

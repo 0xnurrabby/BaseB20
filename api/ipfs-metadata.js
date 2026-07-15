@@ -25,6 +25,24 @@ function extensionFor(type) {
   return "png";
 }
 
+function extractCid(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^ipfs:\/\//i.test(text)) {
+    return text.replace(/^ipfs:\/\//i, "").replace(/^ipfs\//i, "").split(/[/?#]/)[0] || "";
+  }
+  try {
+    const url = new URL(text);
+    const fromQuery = url.searchParams.get("cid") || "";
+    if (fromQuery) return fromQuery;
+    const idx = url.pathname.toLowerCase().indexOf("/ipfs/");
+    if (idx >= 0) return url.pathname.slice(idx + 6).split(/[/?#]/)[0] || "";
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
 async function imageFromPayload(payload, tokenName) {
   const type = typeof payload.imageType === "string" ? payload.imageType : "";
   const base64 = typeof payload.imageBase64 === "string" ? payload.imageBase64 : "";
@@ -42,7 +60,14 @@ async function imageFromPayload(payload, tokenName) {
   }
 
   const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl.trim() : "";
-  if (!imageUrl || imageUrl.startsWith("ipfs://")) return null;
+  if (!imageUrl) return null;
+
+  // Already an IPFS URI/CID - reuse without re-uploading the bytes.
+  const existingCid = extractCid(imageUrl);
+  if (existingCid && (/^ipfs:\/\//i.test(imageUrl) || imageUrl.includes("/ipfs/") || imageUrl.includes("logo-image"))) {
+    return { existingCid };
+  }
+
   let url;
   try {
     url = new URL(imageUrl);
@@ -82,40 +107,39 @@ module.exports = async function handler(req, res) {
     pinataCredentials();
     const name = clean(payload.name, "B20 Token");
     const symbol = clean(payload.symbol, "B20", 24).toUpperCase();
+    const description = clean(payload.description, `${name} (${symbol}) is a native B20 token on Base.`, 500);
     const image = await imageFromPayload(payload, safeName(name, "b20-token"));
+
+    // If caller already has an IPFS image CID, pass it through metadata.image.
+    const existingImageUri = image?.existingCid ? `ipfs://${image.existingCid}` : "";
     const metadata = {
       name,
       symbol,
-      description: `${name} (${symbol}) is a native B20 token on Base.`,
-      image: clean(payload.imageUrl, "", 600),
-      logoURI: clean(payload.imageUrl, "", 600),
-      external_url: "https://base.nurlab.xyz",
-      properties: {
-        chain: "Base",
-        standard: "B20",
-        type: "Asset",
-      },
+      description,
+      image: existingImageUri,
     };
+
+    const pinImage = image && image.bytes
+      ? { bytes: image.bytes, type: image.type, filename: image.filename, name: `${symbol}-logo` }
+      : null;
+
     const pinned = await pinMetadataWithFallback({
-      image: image ? { ...image, name: `${symbol}-logo` } : null,
+      image: pinImage,
       metadata,
       metadataName: `${symbol}-metadata.json`,
     });
 
-    const publicOrigin = (process.env.PUBLIC_APP_URL || "https://base.nurlab.xyz").replace(/\/$/, "");
-    const imageGatewayUrl = pinned.imageCid ? `https://gateway.pinata.cloud/ipfs/${pinned.imageCid}` : "";
-    // On-chain logoURI must be a direct HTTPS image browsers can load.
-    const logoURI = pinned.imageCid
-      ? `${publicOrigin}/api/logo-image?cid=${encodeURIComponent(pinned.imageCid)}`
-      : pinned.imageUri || "";
+    // BaseScan/Base app: contractURI = ipfs metadata JSON with image: ipfs://...
+    // logoURI extraMetadata is optional; we still set ipfs:// for app UI convenience.
+    const imageUri = pinned.imageUri || existingImageUri;
+    const imageCid = pinned.imageCid || (existingImageUri ? extractCid(existingImageUri) : "");
 
     return send(res, 200, {
       contractURI: `ipfs://${pinned.metadataCid}`,
-      logoURI,
-      imageURI: logoURI,
-      ipfsUri: pinned.imageUri,
+      logoURI: imageUri,
+      imageURI: imageUri,
       metadataGatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.metadataCid}`,
-      imageGatewayUrl,
+      imageGatewayUrl: imageCid ? `https://gateway.pinata.cloud/ipfs/${imageCid}` : "",
       pinataKey: pinned.credentialLabel,
     });
   } catch (error) {

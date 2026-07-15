@@ -2,12 +2,9 @@ import { displayLogoUrl, logoProxyUrl } from "./image-url";
 
 const FALLBACK_ORIGIN = "https://base.nurlab.xyz";
 
-function buildMetadataImageUrl(image: string, base: string) {
-  const clean = image.trim();
-  if (!clean) return "";
-  return logoProxyUrl(clean, base) || displayLogoUrl(clean, base);
-}
-
+/**
+ * Dynamic metadata API fallback (legacy). Prefer IPFS contractURI from /api/ipfs-metadata.
+ */
 export function buildTokenMetadataUri({
   name,
   symbol,
@@ -23,7 +20,7 @@ export function buildTokenMetadataUri({
   const url = new URL("/api/token-metadata", base);
   url.searchParams.set("name", name.trim() || "B20 Token");
   url.searchParams.set("symbol", symbol.trim() || "B20");
-  const metadataImage = buildMetadataImageUrl(image, base);
+  const metadataImage = logoProxyUrl(image, base) || displayLogoUrl(image, base);
   if (metadataImage) url.searchParams.set("image", metadataImage);
   if (image.trim()) url.searchParams.set("source", image.trim());
   return url.toString();

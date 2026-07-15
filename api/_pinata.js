@@ -139,24 +139,34 @@ async function pinFileWithFallback(file) {
   throw new Error(`All Pinata keys failed. ${errors[errors.length - 1] || "Try another key."}`);
 }
 
+/**
+ * Pin image + metadata like o1 Launchpad:
+ * - image file -> ipfs://imageCid
+ * - metadata JSON image field = pure ipfs:// (BaseScan / Base app require this)
+ * - contractURI = ipfs://metadataCid
+ */
 async function pinMetadataWithFallback({ image, metadata, metadataName }) {
   const credentials = pinataCredentials();
   const errors = [];
   for (const credential of credentials) {
     try {
       const imageCid = image ? await pinFileWithCredential(image, credential) : "";
-      const imageUri = imageCid ? `ipfs://${imageCid}` : metadata.image || "";
-      const imageHttps = imageCid ? `https://gateway.pinata.cloud/ipfs/${imageCid}` : imageUri;
-      const metadataCid = await pinJsonWithCredential(
-        {
-          ...metadata,
-          image: imageHttps || imageUri,
-          image_url: imageHttps || imageUri,
-          logoURI: imageUri,
-        },
-        metadataName,
-        credential
-      );
+      // Prefer pure ipfs:// for the image field (matches working o1 tokens on BaseScan).
+      let imageUri = "";
+      if (imageCid) imageUri = `ipfs://${imageCid}`;
+      else if (typeof metadata.image === "string" && metadata.image.startsWith("ipfs://")) imageUri = metadata.image;
+
+      const pinBody = {
+        name: metadata.name,
+        symbol: metadata.symbol,
+        description: metadata.description || `${metadata.name} (${metadata.symbol}) is a native B20 token on Base.`,
+        standard: "B20",
+        launchpad: "B20",
+        launchpadUrl: "https://base.nurlab.xyz",
+        image: imageUri,
+      };
+
+      const metadataCid = await pinJsonWithCredential(pinBody, metadataName, credential);
       return {
         imageCid,
         imageUri,
