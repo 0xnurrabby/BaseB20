@@ -1,11 +1,14 @@
 /**
- * Compress token logos for IPFS: small file, sharp square look.
- * Target ~120 KB, max edge 512px. Prefers WebP, keeps PNG when needed.
+ * Compress token logos for wallets:
+ * - max 512px edge
+ * - prefer JPEG (best wallet support, same as o1 LUNA logos)
+ * - PNG only when transparency is needed
+ * - target ~80-120 KB
  */
 
 const MAX_EDGE = 512;
-const TARGET_BYTES = 120 * 1024;
-const HARD_MAX_BYTES = 250 * 1024;
+const TARGET_BYTES = 100 * 1024;
+const HARD_MAX_BYTES = 200 * 1024;
 
 function loadSharp() {
   try {
@@ -19,40 +22,57 @@ async function optimizeWithSharp(bytes) {
   const sharp = loadSharp();
   if (!sharp) return null;
 
-  const base = sharp(bytes, {
+  const image = sharp(bytes, {
     animated: false,
     limitInputPixels: 40_000_000,
     failOn: "none",
-  })
-    .rotate()
-    .resize(MAX_EDGE, MAX_EDGE, {
-      fit: "inside",
-      withoutEnlargement: true,
-      kernel: "lanczos3",
-    });
+  }).rotate();
 
-  // Prefer WebP ladder for smallest clear logos.
-  for (const quality of [82, 72, 62, 52, 42]) {
-    const out = await base.clone().webp({ quality, effort: 4, alphaQuality: 90 }).toBuffer();
-    if (out.byteLength <= TARGET_BYTES || quality === 42) {
-      if (out.byteLength <= HARD_MAX_BYTES || quality === 42) {
-        return { bytes: out, type: "image/webp", ext: "webp" };
+  const meta = await image.metadata();
+  const hasAlpha = Boolean(meta.hasAlpha);
+
+  const base = image.resize(MAX_EDGE, MAX_EDGE, {
+    fit: "inside",
+    withoutEnlargement: true,
+    kernel: "lanczos3",
+  });
+
+  // JPEG first — MetaMask / Coinbase / most wallets handle it best.
+  if (!hasAlpha) {
+    for (const quality of [86, 78, 70, 60, 50, 42]) {
+      const out = await base
+        .clone()
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
+        .jpeg({ quality, mozjpeg: true, chromaSubsampling: "4:2:0" })
+        .toBuffer();
+      if (out.byteLength <= TARGET_BYTES || quality <= 50) {
+        if (out.byteLength <= HARD_MAX_BYTES || quality === 42) {
+          return { bytes: out, type: "image/jpeg", ext: "jpg" };
+        }
       }
     }
   }
 
-  // PNG fallback (good for flat logos / transparency).
-  const png = await base
-    .clone()
-    .png({ compressionLevel: 9, palette: true, quality: 80, effort: 8 })
-    .toBuffer();
-  if (png.byteLength <= HARD_MAX_BYTES) {
-    return { bytes: png, type: "image/png", ext: "png" };
+  // Transparent logos: PNG palette.
+  for (const quality of [90, 80, 70]) {
+    const png = await base
+      .clone()
+      .png({ compressionLevel: 9, palette: true, quality, effort: 8 })
+      .toBuffer();
+    if (png.byteLength <= TARGET_BYTES || quality === 70) {
+      if (png.byteLength <= HARD_MAX_BYTES) {
+        return { bytes: png, type: "image/png", ext: "png" };
+      }
+    }
   }
 
-  // Last resort: smaller WebP.
-  const tiny = await base.clone().webp({ quality: 35, effort: 6 }).toBuffer();
-  return { bytes: tiny, type: "image/webp", ext: "webp" };
+  // Last resort JPEG even with alpha (white background).
+  const tiny = await base
+    .clone()
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .jpeg({ quality: 40, mozjpeg: true })
+    .toBuffer();
+  return { bytes: tiny, type: "image/jpeg", ext: "jpg" };
 }
 
 /**
@@ -68,14 +88,13 @@ async function optimizeLogoImage(bytes, inputType = "") {
   try {
     const optimized = await optimizeWithSharp(bytes);
     if (optimized && optimized.bytes.byteLength > 0) {
-      // Keep original only if already smaller and acceptable type.
       const type = String(inputType || "").toLowerCase();
-      const alreadySmall =
+      const alreadyGood =
         bytes.byteLength <= TARGET_BYTES &&
         bytes.byteLength <= optimized.bytes.byteLength &&
-        (type === "image/png" || type === "image/jpeg" || type === "image/webp");
-      if (alreadySmall) {
-        const ext = type === "image/jpeg" ? "jpg" : type === "image/webp" ? "webp" : "png";
+        (type === "image/jpeg" || type === "image/png");
+      if (alreadyGood) {
+        const ext = type === "image/jpeg" ? "jpg" : "png";
         return { bytes, type, ext, optimized: false };
       }
       return { ...optimized, optimized: true };
@@ -84,7 +103,6 @@ async function optimizeLogoImage(bytes, inputType = "") {
     // fall through
   }
 
-  // No sharp / failed: pass through if under hard max.
   if (bytes.byteLength > HARD_MAX_BYTES) {
     throw new Error("Image is too large after processing. Use a simpler logo under 3 MB.");
   }

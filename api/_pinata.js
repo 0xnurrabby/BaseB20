@@ -151,10 +151,16 @@ async function pinMetadataWithFallback({ image, metadata, metadataName }) {
   for (const credential of credentials) {
     try {
       const imageCid = image ? await pinFileWithCredential(image, credential) : "";
-      // Prefer pure ipfs:// for the image field (matches working o1 tokens on BaseScan).
+      // ipfs:// for explorers that resolve IPFS; HTTPS for MetaMask / Coinbase watchAsset.
       let imageUri = "";
       if (imageCid) imageUri = `ipfs://${imageCid}`;
       else if (typeof metadata.image === "string" && metadata.image.startsWith("ipfs://")) imageUri = metadata.image;
+
+      const imageHttps = imageCid
+        ? `https://gateway.pinata.cloud/ipfs/${imageCid}`
+        : imageUri.startsWith("ipfs://")
+          ? `https://gateway.pinata.cloud/ipfs/${imageUri.replace(/^ipfs:\/\//i, "")}`
+          : imageUri;
 
       const pinBody = {
         name: metadata.name,
@@ -163,13 +169,18 @@ async function pinMetadataWithFallback({ image, metadata, metadataName }) {
         standard: "B20",
         launchpad: "B20",
         launchpadUrl: "https://base.nurlab.xyz",
+        // Primary NFT-style field (Base app / IPFS-aware clients)
         image: imageUri,
+        // Wallet-friendly HTTPS mirrors (MetaMask, Coinbase, Trust, etc.)
+        image_url: imageHttps,
+        logoURI: imageHttps,
       };
 
       const metadataCid = await pinJsonWithCredential(pinBody, metadataName, credential);
       return {
         imageCid,
         imageUri,
+        imageHttps,
         metadataCid,
         credentialLabel: credential.label,
       };

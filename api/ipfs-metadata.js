@@ -136,17 +136,22 @@ module.exports = async function handler(req, res) {
       metadataName: `${symbol}-metadata.json`,
     });
 
-    // BaseScan/Base app: contractURI = ipfs metadata JSON with image: ipfs://...
-    // logoURI extraMetadata is optional; we still set ipfs:// for app UI convenience.
+    // contractURI stays ipfs:// metadata JSON (image: ipfs:// + HTTPS mirrors inside).
+    // On-chain logoURI uses HTTPS so MetaMask/Coinbase wallet_watchAsset can load it.
     const imageUri = pinned.imageUri || existingImageUri;
     const imageCid = pinned.imageCid || (existingImageUri ? extractCid(existingImageUri) : "");
+    const imageHttps =
+      pinned.imageHttps ||
+      (imageCid ? `https://gateway.pinata.cloud/ipfs/${imageCid}` : "") ||
+      imageUri;
 
     return send(res, 200, {
       contractURI: `ipfs://${pinned.metadataCid}`,
-      logoURI: imageUri,
+      logoURI: imageHttps,
       imageURI: imageUri,
+      ipfsUri: imageUri,
       metadataGatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.metadataCid}`,
-      imageGatewayUrl: imageCid ? `https://gateway.pinata.cloud/ipfs/${imageCid}` : "",
+      imageGatewayUrl: imageHttps,
       pinataKey: pinned.credentialLabel,
     });
   } catch (error) {

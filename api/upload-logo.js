@@ -57,10 +57,12 @@ module.exports = async function handler(req, res) {
       filename: `${name}.${optimized.ext}`,
       name,
     });
+    const gatewayUrl = `https://gateway.pinata.cloud/ipfs/${pinned.cid}`;
     return send(res, 200, {
-      url: `ipfs://${pinned.cid}`,
+      // HTTPS for wallet import; IPFS still available as ipfsUri.
+      url: gatewayUrl,
       ipfsUri: `ipfs://${pinned.cid}`,
-      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.cid}`,
+      gatewayUrl,
       displayUrl: `https://base.nurlab.xyz/api/logo-image?cid=${encodeURIComponent(pinned.cid)}`,
       pinataKey: pinned.credentialLabel,
       bytes: optimized.bytes.byteLength,
