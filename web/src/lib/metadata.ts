@@ -1,14 +1,11 @@
-import { displayLogoUrl, pinataGatewayUrl } from "./image-url";
+import { displayLogoUrl, logoProxyUrl } from "./image-url";
 
 const FALLBACK_ORIGIN = "https://base.nurlab.xyz";
 
 function buildMetadataImageUrl(image: string, base: string) {
   const clean = image.trim();
   if (!clean) return "";
-  // Prefer HTTPS Pinata for wallets/explorers; fall back to same-origin proxy.
-  const gateway = pinataGatewayUrl(clean);
-  if (gateway.startsWith("https://")) return gateway;
-  return displayLogoUrl(clean, base);
+  return logoProxyUrl(clean, base) || displayLogoUrl(clean, base);
 }
 
 export function buildTokenMetadataUri({

@@ -102,12 +102,18 @@ module.exports = async function handler(req, res) {
       metadataName: `${symbol}-metadata.json`,
     });
 
+    const publicOrigin = (process.env.PUBLIC_APP_URL || "https://base.nurlab.xyz").replace(/\/$/, "");
     const imageGatewayUrl = pinned.imageCid ? `https://gateway.pinata.cloud/ipfs/${pinned.imageCid}` : "";
+    // On-chain logoURI must be a direct HTTPS image browsers can load.
+    const logoURI = pinned.imageCid
+      ? `${publicOrigin}/api/logo-image?cid=${encodeURIComponent(pinned.imageCid)}`
+      : pinned.imageUri || "";
 
     return send(res, 200, {
       contractURI: `ipfs://${pinned.metadataCid}`,
-      logoURI: pinned.imageUri,
-      imageURI: pinned.imageUri,
+      logoURI,
+      imageURI: logoURI,
+      ipfsUri: pinned.imageUri,
       metadataGatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.metadataCid}`,
       imageGatewayUrl,
       pinataKey: pinned.credentialLabel,

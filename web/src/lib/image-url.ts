@@ -1,6 +1,10 @@
 const FALLBACK_ORIGIN = "https://base.nurlab.xyz";
 const CID_RE = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{50,})$/i;
 
+export function appOrigin(origin?: string) {
+  return origin || (typeof window !== "undefined" ? window.location.origin : FALLBACK_ORIGIN);
+}
+
 export function logoUrlError(value: string) {
   const text = value.trim();
   if (!text) return "";
@@ -26,7 +30,7 @@ export function logoUrlError(value: string) {
   return "";
 }
 
-/** Extract a CIDv0/CIDv1 from ipfs://, gateway URLs, or bare CID strings. */
+/** Extract a CIDv0/CIDv1 from ipfs://, gateway URLs, proxy URLs, or bare CID strings. */
 export function extractCid(value: string) {
   const text = value.trim();
   if (!text) return "";
@@ -38,7 +42,10 @@ export function extractCid(value: string) {
   }
 
   try {
-    const url = new URL(text);
+    const url = new URL(text, FALLBACK_ORIGIN);
+    const cidParam = url.searchParams.get("cid") || url.searchParams.get("ipfs") || "";
+    if (CID_RE.test(cidParam)) return cidParam;
+
     if (url.protocol !== "https:" && url.protocol !== "http:") return "";
 
     const ipfsIdx = url.pathname.toLowerCase().indexOf("/ipfs/");
@@ -61,41 +68,62 @@ export function ipfsCidPath(value: string) {
   return extractCid(value);
 }
 
-/** Public Pinata gateway URL for wallets/explorers. */
+/** Permanent app-hosted logo URL for a CID. Works in browsers, wallets and explorers. */
+export function logoProxyUrl(cidOrUri: string, origin?: string) {
+  const cid = extractCid(cidOrUri);
+  if (!cid) return "";
+  const url = new URL("/api/logo-image", appOrigin(origin));
+  url.searchParams.set("cid", cid);
+  return url.toString();
+}
+
+/** Public Pinata gateway URL. */
 export function pinataGatewayUrl(value: string) {
   const cid = extractCid(value);
   return cid ? `https://gateway.pinata.cloud/ipfs/${cid}` : value.trim();
 }
 
 /**
- * Browser-safe logo URL. Always prefers same-origin /api/logo-image so the UI
- * does not depend on third-party IPFS gateways that block browsers.
+ * Browser-safe logo URL for <img src>.
+ * - blob/data pass through
+ * - IPFS / gateway / proxy URLs normalize to same-origin /api/logo-image
+ * - other https links pass through
  */
 export function displayLogoUrl(value?: string, origin?: string) {
   const text = value?.trim() || "";
   if (!text) return "";
   if (text.startsWith("blob:") || text.startsWith("data:")) return text;
 
-  const base = origin || (typeof window !== "undefined" ? window.location.origin : FALLBACK_ORIGIN);
-  const cid = extractCid(text);
-  if (cid) {
-    const url = new URL("/api/logo-image", base);
-    url.searchParams.set("cid", cid);
-    return url.toString();
-  }
+  const proxied = logoProxyUrl(text, origin);
+  if (proxied) return proxied;
 
   try {
-    const parsed = new URL(text);
+    const parsed = new URL(text, appOrigin(origin));
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
     if (parsed.hostname.toLowerCase() === "i.ibb.co") {
-      const url = new URL("/api/logo-image", base);
+      const url = new URL("/api/logo-image", appOrigin(origin));
       url.searchParams.set("url", text);
       return url.toString();
     }
-    return text;
+    return parsed.toString();
   } catch {
     return "";
   }
+}
+
+/** Normalize any uploaded logo value to the permanent on-chain form. */
+export function normalizeLogoURI(value: string, origin?: string) {
+  const text = value.trim();
+  if (!text) return "";
+  const proxied = logoProxyUrl(text, origin);
+  if (proxied) return proxied;
+  try {
+    const url = new URL(text);
+    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
+  } catch {
+    // ignore
+  }
+  return text;
 }
 
 /** @deprecated use displayLogoUrl */

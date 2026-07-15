@@ -672,13 +672,37 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
   const [symbol, setSymbol] = useState(token.symbol);
   const [contractURI, setContractURI] = useState(token.contractURI);
   const [logoURI, setLogoURI] = useState(token.logoURI);
+  const [logoDirty, setLogoDirty] = useState(false);
 
   useEffect(() => {
     setName(token.name);
     setSymbol(token.symbol);
     setContractURI(token.contractURI);
     setLogoURI(token.logoURI);
-  }, [token.address, token.name, token.symbol, token.contractURI, token.logoURI]);
+    setLogoDirty(false);
+  }, [token.address]);
+
+  useEffect(() => {
+    setName(token.name);
+    setSymbol(token.symbol);
+    setContractURI(token.contractURI);
+    if (!logoDirty) setLogoURI(token.logoURI);
+  }, [token.name, token.symbol, token.contractURI, token.logoURI, logoDirty]);
+
+  function setLogo(next: string) {
+    setLogoDirty(true);
+    setLogoURI(next);
+    if (next.trim()) {
+      saveToken({
+        address: token.address,
+        name: token.name,
+        symbol: token.symbol,
+        chainId,
+        createdAt: Date.now(),
+        logoURI: next.trim(),
+      });
+    }
+  }
 
   const logoError = logoUrlError(logoURI);
   const suggestedContractURI = logoURI.trim() && !logoError
@@ -744,9 +768,9 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
           error={logoError}
           hint="Upload pins the image to IPFS. If pasting manually, use a direct https:// image link or ipfs:// URI."
         >
-          <LogoPicker value={logoURI} onChange={setLogoURI} symbol={symbol || token.symbol} disabled={!canMetadata} />
+          <LogoPicker value={logoURI} onChange={setLogo} symbol={symbol || token.symbol} disabled={!canMetadata} />
           <div className="mt-3 flex gap-2">
-            <Input value={logoURI} onChange={(e) => setLogoURI(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
+            <Input value={logoURI} onChange={(e) => setLogo(e.target.value.trim())} placeholder="https://..." disabled={!canMetadata} />
             <MetadataSyncButton
               token={token}
               chainId={chainId}
@@ -754,6 +778,7 @@ function MetadataPanel({ token, chainId, refetch }: Ctx) {
               metadataURI={suggestedContractURI}
               disabled={!canMetadata || !!logoError || !logoURI.trim()}
               onSuccess={() => {
+                setLogoDirty(false);
                 saveToken({ address: token.address, name: token.name, symbol: token.symbol, chainId, createdAt: Date.now(), logoURI: logoURI.trim() });
                 setContractURI(suggestedContractURI || contractURI);
                 refetch();
