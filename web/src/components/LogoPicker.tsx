@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES, uploadImage } from "../lib/upload";
 import { Button, cn } from "./ui";
 import { IconCheck, IconLoader, IconX } from "./icons";
-import { ipfsGatewayUrl } from "../lib/image-url";
+import { ipfsCidPath, ipfsGatewayUrl, nextIpfsGatewayUrl } from "../lib/image-url";
 
 /**
  * Token logo picker. In immediate mode it uploads the image now. In deferred
@@ -32,6 +32,7 @@ export function LogoPicker({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [gatewayIndex, setGatewayIndex] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -99,7 +100,16 @@ export function LogoPicker({
     if (!selectedFile || mode === "defer") onChange("");
   }
 
-  const preview = previewUrl || (value ? ipfsGatewayUrl(value) : "");
+  useEffect(() => {
+    setGatewayIndex(0);
+  }, [value]);
+
+  const remotePreview = value
+    ? ipfsCidPath(value)
+      ? ipfsGatewayUrl(value, gatewayIndex)
+      : value
+    : "";
+  const preview = previewUrl || remotePreview;
 
   return (
     <div>
@@ -118,8 +128,15 @@ export function LogoPicker({
               <img
                 src={preview}
                 alt="Token logo"
+                referrerPolicy="no-referrer"
                 className="h-full w-full object-cover"
-                onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")}
+                onError={(e) => {
+                  if (value && ipfsCidPath(value) && nextIpfsGatewayUrl(value, gatewayIndex)) {
+                    setGatewayIndex((i) => i + 1);
+                    return;
+                  }
+                  (e.target as HTMLImageElement).style.visibility = "hidden";
+                }}
               />
             )
           ) : status === "uploading" ? (

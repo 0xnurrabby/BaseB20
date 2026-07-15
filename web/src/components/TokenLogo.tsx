@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "./ui";
-import { ipfsGatewayUrl } from "../lib/image-url";
+import { ipfsCidPath, ipfsGatewayUrl, nextIpfsGatewayUrl } from "../lib/image-url";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
@@ -24,11 +24,16 @@ export function TokenLogo({
   tone?: "emerald" | "sky" | "violet";
   className?: string;
 }) {
+  const [gatewayIndex, setGatewayIndex] = useState(0);
   const [failed, setFailed] = useState(false);
   const clean = src?.trim();
-  const imageSrc = clean ? ipfsGatewayUrl(clean) : "";
+  const isIpfs = !!clean && !!ipfsCidPath(clean);
+  const imageSrc = clean ? (isIpfs ? ipfsGatewayUrl(clean, gatewayIndex) : clean) : "";
 
-  useEffect(() => setFailed(false), [clean]);
+  useEffect(() => {
+    setGatewayIndex(0);
+    setFailed(false);
+  }, [clean]);
 
   if (imageSrc && !failed) {
     return (
@@ -38,7 +43,13 @@ export function TokenLogo({
         referrerPolicy="no-referrer"
         loading="lazy"
         className={cn("shrink-0 rounded-full border border-border object-cover", sizeClass[size], className)}
-        onError={() => setFailed(true)}
+        onError={() => {
+          if (isIpfs && clean && nextIpfsGatewayUrl(clean, gatewayIndex)) {
+            setGatewayIndex((i) => i + 1);
+            return;
+          }
+          setFailed(true);
+        }}
       />
     );
   }

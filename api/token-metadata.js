@@ -18,6 +18,16 @@ function cleanImage(value) {
   return text.slice(0, 600);
 }
 
+function publicImageUrl(value) {
+  const text = cleanImage(value);
+  if (!text) return "";
+  if (/^ipfs:\/\//i.test(text)) {
+    const path = text.replace(/^ipfs:\/\//i, "").replace(/^ipfs\//i, "").replace(/^\/+/, "");
+    return path ? `https://gateway.pinata.cloud/ipfs/${path}` : "";
+  }
+  return text;
+}
+
 function cleanSource(value) {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return "";
@@ -40,8 +50,9 @@ module.exports = function handler(req, res) {
 
   const name = clean(req.query.name, "B20 Token");
   const symbol = clean(req.query.symbol, "B20", 24).toUpperCase();
-  const image = cleanImage(req.query.image);
+  const image = publicImageUrl(req.query.image);
   const source = cleanSource(req.query.source);
+  const logo = publicImageUrl(source) || image;
 
   return send(res, 200, {
     name,
@@ -49,7 +60,7 @@ module.exports = function handler(req, res) {
     description: `${name} (${symbol}) is a native B20 token on Base.`,
     image,
     image_url: image,
-    logoURI: source || image,
+    logoURI: logo,
     external_url: "https://base.nurlab.xyz",
     properties: {
       chain: "Base",
