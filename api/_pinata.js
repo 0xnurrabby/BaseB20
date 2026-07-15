@@ -146,7 +146,17 @@ async function pinMetadataWithFallback({ image, metadata, metadataName }) {
     try {
       const imageCid = image ? await pinFileWithCredential(image, credential) : "";
       const imageUri = imageCid ? `ipfs://${imageCid}` : metadata.image || "";
-      const metadataCid = await pinJsonWithCredential({ ...metadata, image: imageUri, logoURI: imageUri }, metadataName, credential);
+      const imageHttps = imageCid ? `https://gateway.pinata.cloud/ipfs/${imageCid}` : imageUri;
+      const metadataCid = await pinJsonWithCredential(
+        {
+          ...metadata,
+          image: imageHttps || imageUri,
+          image_url: imageHttps || imageUri,
+          logoURI: imageUri,
+        },
+        metadataName,
+        credential
+      );
       return {
         imageCid,
         imageUri,

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES, uploadImage } from "../lib/upload";
+import { displayLogoUrl } from "../lib/image-url";
 import { Button, cn } from "./ui";
 import { IconCheck, IconLoader, IconX } from "./icons";
-import { ipfsCidPath, ipfsGatewayUrl, nextIpfsGatewayUrl } from "../lib/image-url";
 
 /**
- * Token logo picker. In immediate mode it uploads the image now. In deferred
- * mode it keeps the file ready so the create flow can pin it with metadata.
+ * Token logo picker. Immediate mode uploads now. Defer mode keeps the file
+ * for create-time IPFS pin with metadata.
  */
 export function LogoPicker({
   value,
@@ -32,7 +32,7 @@ export function LogoPicker({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [gatewayIndex, setGatewayIndex] = useState(0);
+  const [remoteFailed, setRemoteFailed] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -40,10 +40,15 @@ export function LogoPicker({
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    setRemoteFailed(false);
+  }, [value]);
+
   function handleFile(file: File | undefined) {
     if (!file) return;
     setUploadError(null);
     setStatus("idle");
+    setRemoteFailed(false);
 
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       setUploadError("Unsupported file type. Use PNG, JPG, GIF or WEBP.");
@@ -96,19 +101,12 @@ export function LogoPicker({
     onFileChange?.(null);
     onPreviewChange?.("");
     setUploadError(null);
+    setRemoteFailed(false);
     setStatus("idle");
     if (!selectedFile || mode === "defer") onChange("");
   }
 
-  useEffect(() => {
-    setGatewayIndex(0);
-  }, [value]);
-
-  const remotePreview = value
-    ? ipfsCidPath(value)
-      ? ipfsGatewayUrl(value, gatewayIndex)
-      : value
-    : "";
+  const remotePreview = value && !remoteFailed ? displayLogoUrl(value) : "";
   const preview = previewUrl || remotePreview;
 
   return (
@@ -130,12 +128,9 @@ export function LogoPicker({
                 alt="Token logo"
                 referrerPolicy="no-referrer"
                 className="h-full w-full object-cover"
-                onError={(e) => {
-                  if (value && ipfsCidPath(value) && nextIpfsGatewayUrl(value, gatewayIndex)) {
-                    setGatewayIndex((i) => i + 1);
-                    return;
-                  }
-                  (e.target as HTMLImageElement).style.visibility = "hidden";
+                onError={() => {
+                  if (previewUrl) return;
+                  setRemoteFailed(true);
                 }}
               />
             )

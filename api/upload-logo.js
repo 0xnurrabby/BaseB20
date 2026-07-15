@@ -65,6 +65,7 @@ module.exports = async function handler(req, res) {
     return send(res, 200, {
       url: `ipfs://${pinned.cid}`,
       gatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.cid}`,
+      displayUrl: `/api/logo-image?cid=${encodeURIComponent(pinned.cid)}`,
       pinataKey: pinned.credentialLabel,
     });
   } catch (error) {

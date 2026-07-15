@@ -102,12 +102,14 @@ module.exports = async function handler(req, res) {
       metadataName: `${symbol}-metadata.json`,
     });
 
+    const imageGatewayUrl = pinned.imageCid ? `https://gateway.pinata.cloud/ipfs/${pinned.imageCid}` : "";
+
     return send(res, 200, {
       contractURI: `ipfs://${pinned.metadataCid}`,
       logoURI: pinned.imageUri,
       imageURI: pinned.imageUri,
       metadataGatewayUrl: `https://gateway.pinata.cloud/ipfs/${pinned.metadataCid}`,
-      imageGatewayUrl: pinned.imageCid ? `https://gateway.pinata.cloud/ipfs/${pinned.imageCid}` : "",
+      imageGatewayUrl,
       pinataKey: pinned.credentialLabel,
     });
   } catch (error) {
